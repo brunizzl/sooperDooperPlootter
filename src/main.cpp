@@ -4,7 +4,7 @@
 
 int main()
 {
-	std::cout << get_position().x << std::endl;
+	std::cout << get_position().y << std::endl;
 	std::cin.get();
 }
 
