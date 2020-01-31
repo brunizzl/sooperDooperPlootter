@@ -4,7 +4,7 @@
 
 int main()
 {
-	std::cout << get_position().x << std::endl;
+	test_cable(0.821, 1000);
 	std::cin.get();
 }
 
