@@ -2,7 +2,12 @@
 
 #include <stdio.h>
 
-#define steps_per_mm
+#include <iostream>
+#include <fstream>
+
+#define steps_per_mm 10
+
+using namespace std;
 
 // Sequenz in der die Spulen des Schrittmotors angeschaltet werden müssen
 const bool sequence[][4] = {
@@ -16,10 +21,17 @@ const bool sequence[][4] = {
 		{ HIGH, LOW,  LOW,  HIGH }
 };
 
+struct Coord
+{
+	double x;
+	double y;
+};
+
 // Schrittmotor Klasse
 class stepper_motor {
 	char pins[4];
 	int current_step = 0;
+	ofstream pos;
 	public:
 		stepper_motor (char, char, char, char);
 		void setup();
@@ -42,6 +54,11 @@ void stepper_motor::setup() {
 	for(int i = 0; i < 4; i++) {
 		pinMode(pins[i], OUTPUT);
 	}
+	ifstream configfile;
+	configfile.open (to_string(pins[0]) + ".txt");
+	double mm << configfile;
+	current_step = mm * steps_per_mm;
+	configfile.close;
 }
 
 // Mach schritte
@@ -79,6 +96,8 @@ void stepper_motor::write_mm(double mm) {
 
 stepper_motor left (19, 16, 26, 20);
 stepper_motor right (17, 18, 22, 23);
+
+std::ofstream left_store ("left.txt");
 
 int main() {
 	wiringPiSetupGpio(); // Initalize Pi GPIO
