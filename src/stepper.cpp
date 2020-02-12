@@ -10,6 +10,7 @@
 #define steps_per_mm 40
 
 #define width 840
+#define width_s width * steps_per_mm
 
 //using namespace std;
 
@@ -25,10 +26,16 @@ const bool sequence[][4] = {
 		{ HIGH, LOW,  LOW,  HIGH }
 };
 
-struct Coord
+struct Coord_mm
 {
 	double x;
 	double y;
+};
+
+struct Coord_steps
+{
+	int x;
+	int y;
 };
 
 // Schrittmotor Klasse
@@ -138,6 +145,10 @@ int mm2steps(double mm){
 	return mm * steps_per_mm;
 }
 
+double steps2mm(int steps){
+	return steps / steps_per_mm;
+}
+
 void go_to(double x, double y){
 	x = mm2steps(x);
 	y = mm2steps(y);
@@ -151,6 +162,44 @@ void go_to(double x, double y){
 	right.step(steps_right);
 }
 
+Coord_mm get_position_mm(){
+	double S1 = steps2mm(left.get_current_step());
+	double S2 = steps2mm(right.get_current_step());
+	double b = width;
+	double x = (b*b + S1*S1 - S2*S2) / (2 * b);
+	double y = sqrt(S1*S1 - x*x);
+
+	std::cout << x << " x mm\n" << y << " y mm\n";
+	return {x, y};
+}
+
+Coord_steps get_position_steps(){
+	int S1 = left.get_current_step();
+	int S2 = right.get_current_step();
+	int b = width_s;
+	int x = (b*b + S1*S1 - S2*S2) / (2 * b);
+	int y = sqrt(S1*S1 - x*x);
+
+	std::cout << x << " x steps\n" << y << " y steps\n";
+	return {x, y};
+}
+
+void run_line(double x, double y){
+	int x2 = mm2steps(x);
+	int y2 = mm2steps(y);
+	Coord_steps now = get_position_steps();
+	int x1 = now.x;
+	int y1 = now.y;
+	int dx = x2 - x1;
+	int dy = y2 - y1;
+	double steigung = dy / dx;
+	while(now.x != x2){
+		if(dx < 0){
+			left
+		}
+	}
+}
+
 
 int main() {
 	wiringPiSetupGpio(); // Initalize Pi GPIO
@@ -162,11 +211,19 @@ int main() {
 	left.setup();
 	right.setup();
 
-	std::cout << right.get_current_step() << '\n';
+	std::cout << left.get_current_step() << " S1 Steps\n";
+	std::cout << right.get_current_step() << " S2 Steps\n";
+	std::cout << steps2mm(left.get_current_step()) << " S1 mm\n";
+	std::cout << steps2mm(right.get_current_step()) << " S2 mm\n";
+	//std::cout << right.get_current_step() << '\n';
 	//right.step(-4000000, 4);
 	//left.step(-40000000, 4);
-	go_to(400, 600);
-	std::cout << right.get_current_step() << '\n';
+	//go_to(400, 600);
+	//std::cout << right.get_current_step() << '\n';
+
+	Coord_mm pos = get_position_mm();
+
+	Coord_steps pos_steps = get_position_steps();
 
 	left.save_cable_length();
 	right.save_cable_length();
