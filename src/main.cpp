@@ -1,10 +1,11 @@
 #include <iostream>
 
-#include "steppers.hpp"
+#include "svgHandling.hpp"
 
-int main()
+int main(int argc, char* argv[])
 {
-	test_cable(0.821, 1000);
+	//test_cable(0.234567, 1000);
+	test::nanosvg();
 	std::cin.get();
 }
 

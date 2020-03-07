@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-Coord get_position()
+Coord_mm get_position()
 {
 	return { 0, 0 };
 }

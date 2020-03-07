@@ -3,7 +3,7 @@
 #include <vector>
 
 
-struct Coord
+struct Coord_mm
 {
 	double x;
 	double y;
@@ -30,11 +30,11 @@ void test_cable(double speed, int total_timesteps);
 
 
 //draws straight line from start to end
-void draw_line(Coord start, Coord end);
+void draw_line(Coord_mm start, Coord_mm end);
 
 //draws staight lines from start to waypoints[1], 
-void draw_path(Coord start, const std::vector<Coord>& waypoints);
+void draw_path(Coord_mm start, const std::vector<Coord_mm>& waypoints);
 
-void draw_circle(Coord center, double radius);
+void draw_circle(Coord_mm center, double radius);
 
-Coord get_position();
+Coord_mm get_position();
