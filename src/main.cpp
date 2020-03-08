@@ -4,8 +4,8 @@
 
 int main(int argc, char* argv[])
 {
-	std::cout << read::find_skip_quotations("\"hi\" hi", "hi");
-	//draw_from_file("samples/test1.svg");
+	draw_from_file("samples/sandbox.svg", 100, 100);
+	//std::cout << Container_Attributes::not_displayed << std::endl;
 	std::cin.get();
 }
 
