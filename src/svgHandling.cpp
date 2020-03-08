@@ -26,7 +26,7 @@ void draw_from_file(const char* const name, double board_width, double board_hei
 	}
 	std::cout << str << std::endl;
 
-	Container_Attributes default_attributes;
+
 
 	auto test = read::next_elem({ str.c_str(), str.length() });
 	while (test.type != read::Elem_Type::end) {
@@ -37,13 +37,25 @@ void draw_from_file(const char* const name, double board_width, double board_hei
 	}
 }
 
+static Coord_mm view_box::min = { 0, 0 };
+static Coord_mm view_box::max = { 100, 100 };
+
+//initialized to be max possible coordinate in both x and y direction
+static const Coord_mm view_box::outside = { std::numeric_limits<double>::max(), std::numeric_limits<double>::max() };
+
+//allows to initialize a matrix by writing it out as in math
+constexpr Transform_Matrix in_matrix_order(double a, double  c, double  e, double  b, double  d, double  f)
+{
+	return Transform_Matrix{ a, b, c, d, e, f };
+}
+
 Transform_Matrix operator*(const Transform_Matrix& fst, const Transform_Matrix& snd)
 {
 	const double& A = fst.a, B = fst.b, C = fst.c, D = fst.d, E = fst.e, F = fst.f,
 	              a = snd.a, b = snd.b, c = snd.c, d = snd.d, e = snd.e, f = snd.f;
 
-	return Transform_Matrix{ A * a + C * b,    A * c + C * d,    E + C * f + A * e,
-	                         B * a + D * b,    B * c + D * d,    F + D * f + B * e };
+	return in_matrix_order(A * a + C * b,    A * c + C * d,    E + C * f + A * e,
+	                       B * a + D * b,    B * c + D * d,    F + D * f + B * e);
 }
 
 Coord_mm operator*(const Transform_Matrix& matrix, Coord_mm vec)
@@ -55,39 +67,16 @@ Coord_mm operator*(const Transform_Matrix& matrix, Coord_mm vec)
 	                 b * x + d * y + f };
 }
 
-
-Container_Attributes Container_Attributes::combine(const View_Box* inner_box, const Transform_Matrix* inner_transformation) const
+Coord_mm to_board_system(const Transform_Matrix& transform, Coord_mm point)
 {
-	Container_Attributes combined_attributes = *this;
-	if (inner_box) {	//only the intersection of both windows is allowed
-		const double& min_x = combined_attributes.view_box.min_x = std::max(this->view_box.min_x, inner_box->min_x);
-		const double max_x = std::min(this->view_box.min_x + this->view_box.width, inner_box->min_x + inner_box->width);
-		combined_attributes.view_box.width  = std::max(max_x - min_x, 0.0);
-
-		const double& min_y = combined_attributes.view_box.min_y = std::max(this->view_box.min_y, inner_box->min_y);
-		const double max_y = std::min(this->view_box.min_y + this->view_box.height, inner_box->min_y + inner_box->height);		
-		combined_attributes.view_box.height = std::max(max_y - min_y, 0.0);
-	}
-	if (inner_transformation) {	
-		combined_attributes.transformation = this->transformation * (*inner_transformation);
-	}
-	return combined_attributes;
-}
-
-Coord_mm Container_Attributes::translate(Coord_mm point) const
-{
-	auto [x, y] = this->transformation * point;
-
-	if (x < this->view_box.min_x || x > this->view_box.min_x + this->view_box.width || y < this->view_box.min_y || y > this->view_box.min_y + this->view_box.height) {
-		return not_displayed;
+	auto [x, y] = transform * point;
+	if (x < view_box::min.x || x > view_box::max.x || y < view_box::min.y || y > view_box::max.y) {
+		return view_box::outside;
 	}
 	else {
 		return { x, y };
 	}
 }
-
-//initialized to be max possible coordinate in both x and y direction
-const Coord_mm Container_Attributes::not_displayed = { std::numeric_limits<double>::max(), std::numeric_limits<double>::max() };
 
 using namespace read;
 
@@ -179,12 +168,12 @@ Elem_Data read::next_elem(std::string_view view)
 	return { Elem_Type::unknown, "" };
 }
 
-void read::evaluate_part(std::string_view part, const Container_Attributes& attributes)
+void read::evaluate_fragment(std::string_view fragment, const Transform_Matrix& transform)
 {
-	Elem_Data next = next_elem(part);
+	Elem_Data next = next_elem(fragment);
 	while (next.type == Elem_Type::unknown) {
-		part.remove_prefix(find_skip_quotations(part, ">"));
-		next = next_elem(part);
+		fragment.remove_prefix(find_skip_quotations(fragment, ">"));
+		next = next_elem(fragment);
 	}
 }
 

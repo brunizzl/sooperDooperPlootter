@@ -12,14 +12,24 @@ constexpr double pi = 3.1415926535897932384626433832795028841971;
 
 
 // "main" function
-//reads svg at file path "name" and moves robot accordingly
-// board_width and board_height are the dimensions of the board the robot draws on in mm
+//reads svg at file path "name" and moves plotter accordingly
+// board_width and board_height are the dimensions of the board the plotter draws on in mm
 void draw_from_file(const char* const name, double board_width, double board_height);
+
+//the svg standard allows for view boxes to be defined inside other view boxes.
+//this forces an implementation of the complete standard to not save the view box as rectangle, but as polygon.
+//also there may be multible instances of view boxes.
+//i ignore all view boxes but the first one and live a happy live.
+namespace view_box {
+	extern Coord_mm min;	//upper left corner of box
+	extern Coord_mm max;	//lower right corner of box
+
+	extern const Coord_mm outside;	//returned to signal the coordinates may not be displayed (not headed torwards)
+}
 
 struct Transform_Matrix
 {
-	double a, c, e,
-		   b, d, f;
+	double a, b, c, d, e, f;
 	//corresponds to Matrix
 	// a c e
 	// b d f
@@ -33,31 +43,8 @@ Transform_Matrix operator*(const Transform_Matrix& fst, const Transform_Matrix& 
 //matrix * vector, as in math. the third coordinate of vec is always 1.
 Coord_mm operator*(const Transform_Matrix& matrix, Coord_mm vec);
 
-
-//here are only arributes listed, that are relevant for plotting.
-//style attributes are therefore missing in this struct.
-struct Container_Attributes
-{
-	struct View_Box
-	{
-		double min_x = 0;		//x-coordinate of the left border
-		double min_y = 0;		//y-coordinate of the upper border (positive y is down)
-		double width = 100;
-		double height = 100;
-	} view_box;
-
-	Transform_Matrix transformation;
-
-	//returns attributes of this combined with attributes specified in arguments
-	Container_Attributes combine(const View_Box* inner_box = nullptr,
-		const Transform_Matrix* inner_transformation = nullptr) const;
-
-	//translates point from system within container to system outside
-	//if point lies outside viewbox, not_displayed is returned
-	Coord_mm translate(Coord_mm point) const;
-
-	const static Coord_mm not_displayed;
-};
+//transforms point to the coordinate system of the board and checkes if point is inside view box
+Coord_mm to_board_system(const Transform_Matrix& transform, Coord_mm point);
 
 //all functions used while parsing/reading
 namespace read {
@@ -83,7 +70,7 @@ namespace read {
 
 		//other things
 		unknown,	//if a type is not listed explicitly in Elem_Type, it will be read as type "unknown"
-		end,		//if no more elements can be read, because the document is fully read, type "end" is returned
+		end,		//if the document is fully read, type "end" is returned
 	};
 
 	//array of all types BUT UNKNOWN to be used in range based for loops
@@ -107,11 +94,12 @@ namespace read {
 
 	Elem_Data next_elem(std::string_view view);
 
-	void evaluate_part(std::string_view part, const Container_Attributes& attributes);
+	void evaluate_fragment(std::string_view fragment, const Transform_Matrix& transform);
 }
 
 //all lengths in mm, angles in rad
 //resolution in draw() determines in how many straight lines the shape is split
+//transform in draw() is matrix needed to transform from current coordinate system to board system
 namespace shape {
 
 	//straight line from start to end
@@ -120,7 +108,7 @@ namespace shape {
 		Coord_mm start;
 		Coord_mm end;
 
-		void draw(const Container_Attributes& attributes) const;
+		void draw(const Transform_Matrix& transform) const;
 	};
 
 	struct Rectangle
@@ -131,7 +119,7 @@ namespace shape {
 		double radius_x;		//corners may be rounded of by a quarter ellypse (== Arc)
 		double radius_y;
 
-		void draw(const Container_Attributes& attributes, std::size_t resolution) const;
+		void draw(const Transform_Matrix& transform, std::size_t resolution) const;
 	};
 
 	struct Circle
@@ -139,7 +127,7 @@ namespace shape {
 		Coord_mm center;
 		double radius;
 
-		void draw(const Container_Attributes& attributes, std::size_t resolution) const;
+		void draw(const Transform_Matrix& transform, std::size_t resolution) const;
 	};
 
 	struct Ellypse
@@ -148,7 +136,7 @@ namespace shape {
 		double radius_x;
 		double radius_y;
 
-		void draw(const Container_Attributes& attributes, std::size_t resolution) const;
+		void draw(const Transform_Matrix& transform, std::size_t resolution) const;
 	};
 
 	struct Arc
@@ -158,7 +146,7 @@ namespace shape {
 		double end_angle;
 		bool draw_positive;	//if true, the plotter moves around center of ellypse in mathematical positive direction (counterclockwise)
 
-		void draw(const Container_Attributes& attributes, std::size_t resolution) const;
+		void draw(const Transform_Matrix& transform, std::size_t resolution) const;
 	};
 
 	struct Quadratic_Bezier
@@ -167,7 +155,7 @@ namespace shape {
 		Coord_mm control;
 		Coord_mm end;
 
-		void draw(const Container_Attributes& attributes, std::size_t resolution) const;
+		void draw(const Transform_Matrix& transform, std::size_t resolution) const;
 	};
 
 	struct Cubic_Bezier
@@ -177,6 +165,6 @@ namespace shape {
 		Coord_mm control_2;
 		Coord_mm end;
 
-		void draw(const Container_Attributes& attributes, std::size_t resolution) const;
+		void draw(const Transform_Matrix& transform, std::size_t resolution) const;
 	};
 }
