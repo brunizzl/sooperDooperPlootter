@@ -21,11 +21,16 @@ void draw_from_file(const char* const name, double board_width, double board_hei
 //also there may be multible instances of view boxes.
 //i ignore all view boxes but the first one and live a happy live.
 namespace view_box {
-	extern Coord_mm min;	//upper left corner of box
-	extern Coord_mm max;	//lower right corner of box
+	extern Vec2D min;	//upper left corner of box
+	extern Vec2D max;	//lower right corner of box
 
-	extern const Coord_mm outside;	//returned to signal the coordinates may not be displayed (not headed torwards)
+	extern const Vec2D outside;	//returned to signal the coordinates may not be displayed (not headed torwards)
+
+	void set(std::string_view data);
 }
+
+
+
 
 struct Transform_Matrix
 {
@@ -41,10 +46,30 @@ struct Transform_Matrix
 Transform_Matrix operator*(const Transform_Matrix& fst, const Transform_Matrix& snd);
 
 //matrix * vector, as in math. the third coordinate of vec is always 1.
-Coord_mm operator*(const Transform_Matrix& matrix, Coord_mm vec);
+Vec2D operator*(const Transform_Matrix& matrix, Vec2D vec);
 
 //transforms point to the coordinate system of the board and checkes if point is inside view box
-Coord_mm to_board_system(const Transform_Matrix& transform, Coord_mm point);
+Vec2D to_board_system(const Transform_Matrix& transform, Vec2D point);
+
+//create matrices from different transformations
+//these are also all taken from here: https://www.w3.org/TR/SVG11/coords.html#TransformMatrixDefined
+Transform_Matrix translate(Vec2D t);
+Transform_Matrix scale(double sx, double sy);
+Transform_Matrix rotate(double angle);	//angle in rad
+Transform_Matrix rotate(double angle, Vec2D pivot);	//angle in rad
+Transform_Matrix skew_x(double angle);
+Transform_Matrix skew_y(double angle);
+
+enum class Transform
+{
+	translate,
+	scale,
+	rotate,
+	skew_x,
+	skew_y,
+};
+
+std::string_view name_of(Transform transform);
 
 //all functions used while parsing/reading
 namespace read {
@@ -55,9 +80,7 @@ namespace read {
 	{
 		//containers
 		svg, 
-		svg_end,	// "/svg"
-		g,
-		g_end,		// "/g"
+		g,			//group
 
 		//shapes
 		line,
@@ -74,8 +97,8 @@ namespace read {
 	};
 
 	//array of all types BUT UNKNOWN to be used in range based for loops
-	static const Elem_Type all_elem_types[] = { Elem_Type::svg, Elem_Type::svg_end, Elem_Type::line, Elem_Type::polyline, Elem_Type::polygon,
-		Elem_Type::rect, Elem_Type::ellypse, Elem_Type::circle, Elem_Type::path, Elem_Type::g, Elem_Type::g_end };
+	static const Elem_Type all_elem_types[] = { Elem_Type::svg, Elem_Type::line, Elem_Type::polyline, Elem_Type::polygon,
+		Elem_Type::rect, Elem_Type::ellypse, Elem_Type::circle, Elem_Type::path, Elem_Type::g, };
 
 	std::string_view name_of(Elem_Type type);
 
@@ -85,17 +108,55 @@ namespace read {
 
 	struct Elem_Data
 	{
-		Elem_Type type;
+		Elem_Type type = Elem_Type::unknown;
 		std::string_view content;	//only shows inner part, not the enclosing angle brackets and name 
 		//example: 
 		// "<circle cx="100" cy="200" r="20"> will be stored as:
 		// {Elem_Type::circle, "cx=\"100\" cy=\"200\" r=\"20\""}
 	};
 
+	//returns view to the part of content describing your attribute
+	//example: std::string_view("cx=\"100\" cy=\"200\" r=\"20\"").get_attribute_data("cx") 
+	//  yields "100", as this is specified after "cx=\""
+	std::string_view get_attribute_data(std::string_view search_zone, std::string_view attr_name);
+
+	//multiple commas/ spaces and combinations thereof are read in as a single seperator.
+	//example: from_csv("-1, 30 4  6.35,9") yields { -1.0, 30.0, 4.0, 6.35. 9.0 }
+	std::vector<double> from_csv(std::string_view csv);
+
+	//units as specified by w3: https://www.w3.org/TR/SVG11/coords.html#Units
+	enum class Unit
+	{
+		/*em, ex,*/ px, pt, pc, mm, cm, in,
+	};
+
+	//helper for to_scaled()
+	double to_pixel(Unit unit);
+
+	//returns unit code as string view. example: name_of(Unit::cm) yields "cm"
+	std::string_view name_of(Unit unit);
+
+	//assumes to have only the numer and (optionally) a unit passed as parameter
+	//example: to_scaled("100")   yields 100.0
+	//         to_scaled("100cm") yields 3543.307
+	//if a unit is not implemented here (the relative ones), the function returns unknown_unit constant 
+	double to_scaled(std::string_view val_str);
+
+	extern const double unknown_unit;
+
+	static const Unit all_units[] = { Unit::px, Unit::pt, Unit::pc, Unit::mm, Unit::cm, Unit::in };
+
 	Elem_Data next_elem(std::string_view view);
 
+	//reads all of fragment
 	void evaluate_fragment(std::string_view fragment, const Transform_Matrix& transform);
+
+	//returns matrix resulting from transformation attributes of group specified in group attributes
+	Transform_Matrix group_transform(std::string_view group_attributes);
 }
+
+
+
 
 //all lengths in mm, angles in rad
 //resolution in draw() determines in how many straight lines the shape is split
@@ -105,15 +166,15 @@ namespace shape {
 	//straight line from start to end
 	struct Line
 	{
-		Coord_mm start;
-		Coord_mm end;
+		Vec2D start;
+		Vec2D end;
 
 		void draw(const Transform_Matrix& transform) const;
 	};
 
 	struct Rectangle
 	{
-		Coord_mm upper_left;	//position of upper left corner
+		Vec2D upper_left;	//position of upper left corner
 		double height;
 		double width;
 		double radius_x;		//corners may be rounded of by a quarter ellypse (== Arc)
@@ -124,7 +185,7 @@ namespace shape {
 
 	struct Circle
 	{
-		Coord_mm center;
+		Vec2D center;
 		double radius;
 
 		void draw(const Transform_Matrix& transform, std::size_t resolution) const;
@@ -132,7 +193,7 @@ namespace shape {
 
 	struct Ellypse
 	{
-		Coord_mm center;
+		Vec2D center;
 		double radius_x;
 		double radius_y;
 
@@ -151,19 +212,19 @@ namespace shape {
 
 	struct Quadratic_Bezier
 	{
-		Coord_mm start;
-		Coord_mm control;
-		Coord_mm end;
+		Vec2D start;
+		Vec2D control;
+		Vec2D end;
 
 		void draw(const Transform_Matrix& transform, std::size_t resolution) const;
 	};
 
 	struct Cubic_Bezier
 	{
-		Coord_mm start;
-		Coord_mm control_1;
-		Coord_mm control_2;
-		Coord_mm end;
+		Vec2D start;
+		Vec2D control_1;
+		Vec2D control_2;
+		Vec2D end;
 
 		void draw(const Transform_Matrix& transform, std::size_t resolution) const;
 	};

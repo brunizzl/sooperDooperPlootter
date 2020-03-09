@@ -1,21 +1,26 @@
 #include "steppers.hpp"
 
-Coord_mm operator+(const Coord_mm a, const Coord_mm b)
+Vec2D operator+(const Vec2D a, const Vec2D b)
 {
 	return { a.x + b.x, a.y + b.y };
 }
 
-Coord_mm operator-(const Coord_mm a, const Coord_mm b)
+Vec2D operator-(const Vec2D a, const Vec2D b)
 {
 	return { a.x - b.x, a.y - b.y };
 }
 
-Coord_mm operator*(const double factor, const Coord_mm vec)
+Vec2D operator-(const Vec2D a)
+{
+	return { -a.x, -a.y };
+}
+
+Vec2D operator*(const double factor, const Vec2D vec)
 {
 	return { factor * vec.x, factor * vec.y };
 }
 
-std::ostream& operator<<(std::ostream& stream, const Coord_mm& coord)
+std::ostream& operator<<(std::ostream& stream, const Vec2D& coord)
 {
 	stream << "(" << coord.x << ", " << coord.y << ")";
 	return stream;
