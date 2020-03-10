@@ -27,10 +27,9 @@ namespace view_box {
 	extern Vec2D min;	//upper left corner of box
 	extern Vec2D max;	//lower right corner of box
 
-	//returned to signal the coordinates may not be displayed (not headed torwards) or as some other error state
-	constexpr Vec2D outside{ std::numeric_limits<double>::max(), std::numeric_limits<double>::max() };	
-
 	void set(std::string_view data);
+
+	bool contains(Vec2D point);
 }
 
 
@@ -51,9 +50,6 @@ Transform_Matrix operator*(const Transform_Matrix& fst, const Transform_Matrix& 
 
 //matrix * vector, as in math. the third coordinate of vec is always 1.
 Vec2D operator*(const Transform_Matrix& matrix, Vec2D vec);
-
-//transforms point to the coordinate system of the board and checkes if point is inside view box
-Vec2D to_board_system(const Transform_Matrix& transform, Vec2D point);
 
 //create matrices from different transformations
 //these are also all taken from here: https://www.w3.org/TR/SVG11/coords.html#TransformMatrixDefined
@@ -169,14 +165,24 @@ namespace read {
 //transform in draw() is matrix needed to transform from current coordinate system to board system
 namespace draw {
 
-	void line				(Transform_Matrix transform, std::string_view parameters, std::size_t resolution = 10);
-	void rect				(Transform_Matrix transform, std::string_view parameters, std::size_t resolution = 10);
-	void circle				(Transform_Matrix transform, std::string_view parameters, std::size_t resolution = 10);
-	void ellypse			(Transform_Matrix transform, std::string_view parameters, std::size_t resolution = 10);
-	void arc				(Transform_Matrix transform, std::string_view parameters, std::size_t resolution = 10);
-	void quadratic_bezier	(Transform_Matrix transform, std::string_view parameters, std::size_t resolution = 10);
-	void cubic_bezier		(Transform_Matrix transform, std::string_view parameters, std::size_t resolution = 10);
-	void path				(Transform_Matrix transform, std::string_view parameters, std::size_t resolution = 10);
-	void polyline			(Transform_Matrix transform, std::string_view parameters, std::size_t resolution = 10);
-	void polygon			(Transform_Matrix transform, std::string_view parameters, std::size_t resolution = 10);
+	void line				(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = 100);
+	void rect				(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = 100);
+	void circle				(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = 100);
+	void ellypse			(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = 100);
+	void polyline			(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = 100);
+	void polygon			(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = 100);
+	void path				(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = 100);
+
+	//the following functions are called mostly from path()
+	//IMPORTANT: all lengths and vectors are assumed to already be transformed.
+
+	//arc is part of ellypse between start_angle and end_angle
+	//if mathematical_positive is true, the arc from start to end turning counterclockwise is drawn, clockwise if false
+	//angles are expected to be in rad
+	void arc(Vec2D center, double rx, double ry, double start_angle, double end_angle, 
+		bool mathematical_positive, std::size_t resolution = 100);
+
+	void path_line(Vec2D start, Vec2D end, std::size_t resolution = 100);
+	void quadratic_bezier(Vec2D start, Vec2D control, Vec2D end, std::size_t resolution = 100);
+	void cubic_bezier(Vec2D start, Vec2D control_1, Vec2D control_2, Vec2D end, std::size_t resolution = 100);
 }

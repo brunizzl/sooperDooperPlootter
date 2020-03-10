@@ -152,6 +152,12 @@ void view_box::set(std::string_view data)
 	view_box::max.y = values[1] + values[3];	//min.y + height
 }
 
+bool view_box::contains(Vec2D point)
+{
+	return point.x >= view_box::min.x && point.x <= view_box::max.x && 
+		point.y >= view_box::min.y && point.y <= view_box::max.y;
+}
+
 
 //allows to initialize a matrix by writing it out as in math
 //because   a c e
@@ -177,18 +183,7 @@ Vec2D operator*(const Transform_Matrix& matrix, Vec2D vec)
 		          x = vec.x, y = vec.y;
 
 	return Vec2D{ a * x + c * y + e,
-	                 b * x + d * y + f };
-}
-
-Vec2D to_board_system(const Transform_Matrix& transform, Vec2D point)
-{
-	auto [x, y] = transform * point;
-	if (x < view_box::min.x || x > view_box::max.x || y < view_box::min.y || y > view_box::max.y) {
-		return view_box::outside;
-	}
-	else {
-		return { x, y };
-	}
+	              b * x + d * y + f };
 }
 
 Transform_Matrix translate(Vec2D t)
@@ -431,7 +426,7 @@ void read::evaluate_fragment(std::string_view fragment, const Transform_Matrix& 
 		case Elem_Type::polygon:	draw::polygon(transform, current.content);	break;
 		case Elem_Type::rect:		draw::rect(transform, current.content);		break;
 		case Elem_Type::ellypse:	draw::ellypse(transform, current.content);	break;
-		case Elem_Type::circle:		draw::circle(transform, current.content);	break;
+		case Elem_Type::circle:		draw::circle(transform, current.content);		break;
 		case Elem_Type::path:		draw::path(transform, current.content);		break;
 		}
 
@@ -509,62 +504,169 @@ Transform_Matrix read::get_transform_matrix(std::string_view group_attributes)
 	return result_matrix;
 }
 
-void draw::line(Transform_Matrix transform, std::string_view parameters, std::size_t resolution)
+void draw::line(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	std::cout << "male line: " << parameters << '\n';
-	std::cout << "mit matrix " << transform << '\n';
+	const double x1 = read::to_scaled(read::get_attribute_data(parameters, { "x1=\"" }), 0.0);
+	const double y1 = read::to_scaled(read::get_attribute_data(parameters, { "y1=\"" }), 0.0);
+	const double x2 = read::to_scaled(read::get_attribute_data(parameters, { "x2=\"" }), 0.0);
+	const double y2 = read::to_scaled(read::get_attribute_data(parameters, { "y2=\"" }), 0.0);
+
+	const Vec2D start = transform_matrix * Vec2D{ x1, y1 };
+	const Vec2D end = transform_matrix * Vec2D{ x1, y1 };
+	go_to(start);
+	path_line(start, end);
 }
 
-void draw::rect(Transform_Matrix transform, std::string_view parameters, std::size_t resolution)
+void draw::rect(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	std::cout << "male rect: " << parameters << '\n';
-	std::cout << "mit matrix " << transform << '\n';
+	const double x = read::to_scaled(read::get_attribute_data(parameters, { "x=\"" }), 0.0);
+	const double y = read::to_scaled(read::get_attribute_data(parameters, { "y=\"" }), 0.0);
+	const double width = read::to_scaled(read::get_attribute_data(parameters, { "width=\"" }), 0.0);
+	const double height = read::to_scaled(read::get_attribute_data(parameters, { "height=\"" }), 0.0);
+	double rx = read::to_scaled(read::get_attribute_data(parameters, { "rx=\"" }), 0.0);
+	double ry = read::to_scaled(read::get_attribute_data(parameters, { "ry=\"" }), 0.0);
+
+	if (rx != 0 && ry == 0) ry = rx;
+	if (rx == 0 && ry != 0) rx = ry;
+	if (rx > width / 2) rx = width / 2;
+	if (ry > height / 2) ry = height / 2;
+
+	if (rx == 0) {	//draw normal rectangle
+		const Vec2D upper_right = transform_matrix * Vec2D{ x + width, y };
+		const Vec2D upper_left =  transform_matrix * Vec2D{ x, y };
+		const Vec2D lower_left =  transform_matrix * Vec2D{ x, y + height };
+		const Vec2D lower_right = transform_matrix * Vec2D{ x + width, y + height };
+
+		//draws in order       |start
+		//                     v
+		//            ---(1)---
+		//           |         |
+		//          (2)       (4)
+		//           |         |
+		//            ---(3)---
+		
+		go_to(upper_right);										//start
+		path_line(upper_right, upper_left, resolution);			//(1)
+		path_line(upper_left, lower_left, resolution);			//(2)
+		path_line(lower_left, lower_right, resolution);			//(3)
+		path_line(lower_right, upper_right, resolution);		//(4)
+	}
+	else {	//draw rectangle with corners rounded of
+		//these two points are the center point of the upper right ellypse (arc) and the lower left ellypse respectively
+		const Vec2D center_upper_right = transform_matrix * Vec2D{ x + width - rx, y + ry };
+		const Vec2D center_lower_left = transform_matrix * Vec2D{ x + rx, y + height - ry };
+		const double right_x = center_upper_right.x;
+		const double left_x = center_lower_left.x;
+		const double upper_y = center_upper_right.y;
+		const double lower_y = center_lower_left.y;
+
+		//draws in order           | start
+		//                         v
+		//              (2)--(1)--(8)
+		//               | X       |
+		//              (3)       (7)
+		//               |       X |
+		//              (4)--(5)--(6)		
+		//with X beeing center_upper_right and center_lower_left
+
+		go_to({ right_x, upper_y });							          //start
+		path_line({ right_x, upper_y - ry }, { left_x, upper_y - ry });	  //(1)
+		arc({ left_x, upper_y }, rx, ry, pi / 2, pi, true);               //(2)
+		path_line({ left_x - rx, upper_y }, { left_x - rx, lower_y });	  //(3)
+		arc({ left_x, lower_y }, rx, ry, pi, -pi / 2, true);	          //(4)
+		path_line({ left_x, lower_y + ry }, { right_x, lower_y + ry });	  //(5)
+		arc({ right_x, lower_y }, rx, ry, -pi / 2, 0, true);	          //(6)
+		path_line({ right_x + rx, lower_y }, { right_x + rx, upper_y });  //(7)
+		arc({ right_x, upper_y }, rx, ry, 0, pi / 2, true);               //(8)
+	}
 }
 
-void draw::circle(Transform_Matrix transform, std::string_view parameters, std::size_t resolution)
+void draw::circle(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	std::cout << "male circle: " << parameters << '\n';
-	std::cout << "mit matrix " << transform << '\n';
+	const double cx = read::to_scaled(read::get_attribute_data(parameters, { "cx=\"" }), 0.0);
+	const double cy = read::to_scaled(read::get_attribute_data(parameters, { "cy=\"" }), 0.0);
+	const double r  = read::to_scaled(read::get_attribute_data(parameters, { "r=\"" }), 0.0);
+
+	go_to(transform_matrix * (Vec2D{ cx, cy } +Vec2D{ r, 0.0 }));	//intersection of positive x-axis and circle is starting point
+	for (std::size_t step = 1; step <= resolution; step++) {
+		const double angle = 2 * pi * (resolution - step);
+		draw_to(transform_matrix * Vec2D{ cx + std::cos(angle) * r, cy + std::sin(angle) * r });
+	}
 }
 
-void draw::ellypse(Transform_Matrix transform, std::string_view parameters, std::size_t resolution)
+void draw::ellypse(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	std::cout << "male ellypse: " << parameters << '\n';
-	std::cout << "mit matrix " << transform << '\n';
+	const double cx = read::to_scaled(read::get_attribute_data(parameters, { "cx=\"" }), 0.0);
+	const double cy = read::to_scaled(read::get_attribute_data(parameters, { "cy=\"" }), 0.0);
+	const double rx = read::to_scaled(read::get_attribute_data(parameters, { "rx=\"" }), 0.0);
+	const double ry = read::to_scaled(read::get_attribute_data(parameters, { "ry=\"" }), 0.0);
+
+	go_to(transform_matrix * (Vec2D{ cx, cy } + Vec2D{ rx, 0.0 }));	//intersection of positive x-axis and ellypse is starting point
+	for (std::size_t step = 1; step <= resolution; step++) {
+		const double angle = 2 * pi * (resolution - step);
+		draw_to(transform_matrix * Vec2D{ cx + std::cos(angle) * rx, cy + std::sin(angle) * ry });
+	}
 }
 
-void draw::arc(Transform_Matrix transform, std::string_view parameters, std::size_t resolution)
-{
-	std::cout << "male arc: " << parameters << '\n';
-	std::cout << "mit matrix " << transform << '\n';
-}
-
-void draw::quadratic_bezier(Transform_Matrix transform, std::string_view parameters, std::size_t resolution)
-{
-	std::cout << "male quadratic_bezier: " << parameters << '\n';
-	std::cout << "mit matrix " << transform << '\n';
-}
-
-void draw::cubic_bezier(Transform_Matrix transform, std::string_view parameters, std::size_t resolution)
-{
-		std::cout << "male cubic_bezier: " << parameters << '\n';
-		std::cout << "mit matrix " << transform << '\n';
-}
-
-void draw::path(Transform_Matrix transform, std::string_view parameters, std::size_t resolution)
-{
-	std::cout << "male path: " << parameters << '\n';
-	std::cout << "mit matrix " << transform << '\n';
-}
-
-void draw::polyline(Transform_Matrix transform, std::string_view parameters, std::size_t resolution)
+void draw::polyline(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
 	std::cout << "male polyline: " << parameters << '\n';
-	std::cout << "mit matrix " << transform << '\n';
+	std::cout << "mit matrix " << transform_matrix << '\n';
 }
 
-void draw::polygon(Transform_Matrix transform, std::string_view parameters, std::size_t resolution)
+void draw::polygon(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
 	std::cout << "male polygon: " << parameters << '\n';
-	std::cout << "mit matrix " << transform << '\n';
+	std::cout << "mit matrix " << transform_matrix << '\n';
+}
+
+void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
+{
+	std::cout << "male path: " << parameters << '\n';
+	std::cout << "mit matrix " << transform_matrix << '\n';
+}
+
+void draw::arc(Vec2D center, double rx, double ry, double start_angle, double end_angle, bool mathematical_positive, std::size_t resolution)
+{
+	const double angle_per_step = mathematical_positive ? 
+		(end_angle - start_angle) / resolution : 
+		(2.0 * pi - (end_angle - start_angle)) / resolution;
+
+	for (std::size_t step = 1; step <= resolution; step++) {
+		const double angle = start_angle + angle_per_step * step;
+		draw_to({ center.x + std::cos(angle) * rx, center.y + std::sin(angle) * ry });
+	}
+}
+
+void draw::path_line(Vec2D start, Vec2D end, std::size_t resolution)
+{
+	for (std::size_t step = 1; step <= resolution; step++) {
+		//as given in wikipedia for linear bezier curves: https://en.wikipedia.org/wiki/B%C3%A9zier_curve#Linear_B%C3%A9zier_curves
+		const double t = step / (double)resolution;
+		draw_to(start + t * (end - start));
+	}
+}
+
+void draw::quadratic_bezier(Vec2D start, Vec2D control, Vec2D end, std::size_t resolution)
+{
+	for (std::size_t step = 1; step <= resolution; step++) {
+		//formula taken from https://en.wikipedia.org/wiki/B%C3%A9zier_curve#Quadratic_B%C3%A9zier_curves
+		const double t = step / (double)resolution;
+		const Vec2D waypoint = (1 - t) * (1 - t) * start + 2 * (1 - t) * t * control + t * t * end;
+		draw_to(waypoint);
+	}
+}
+
+void draw::cubic_bezier(Vec2D start, Vec2D control_1, Vec2D control_2, Vec2D end, std::size_t resolution)
+{
+	for (std::size_t step = 1; step <= resolution; step++) {
+		//formula taken from https://en.wikipedia.org/wiki/B%C3%A9zier_curve#Cubic_B%C3%A9zier_curves
+		const double t = step / (double)resolution;
+		const double tpow2 = t * t;
+		const double onet = (1 - t);
+		const double onetpow2 = onet * onet;
+		const Vec2D waypoint = onetpow2 * (onet * start + 3 * t * control_1) + tpow2 * (3 * onet * control_2 + t * end);
+		//const Vec2D waypoint = (1 - t) * (1 - t) * (1 - t) * start + 3 * (1 - t) * (1 - t) * t * control_1 + 3 * (1 - t) * t * t * control_2 + t * t * t * end;
+		draw_to(waypoint);
+	}
 }
