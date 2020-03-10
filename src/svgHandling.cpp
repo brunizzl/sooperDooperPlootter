@@ -444,7 +444,7 @@ Transform_Matrix read::get_transform_matrix(std::string_view group_attributes)
 	Transform_Matrix result_matrix = in_matrix_order(1, 0, 0,
 		                                             0, 1, 0);	//starts as identity matrix
 
-	std::string_view transform_list = get_attribute_data(group_attributes, "transform=\"");
+	std::string_view transform_list = get_attribute_data(group_attributes, { "transform=\"" });
 	while (transform_list.length()) {
 		for (Transform transform : all_transforms) {
 			const std::string_view name = name_of(transform);
@@ -506,6 +506,11 @@ Transform_Matrix read::get_transform_matrix(std::string_view group_attributes)
 
 void draw::line(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
+	const std::string_view transform_data = get_attribute_data(parameters, { "transform=\"" });
+	if (transform_data != "") {
+		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
+	}
+
 	const double x1 = read::to_scaled(read::get_attribute_data(parameters, { "x1=\"" }), 0.0);
 	const double y1 = read::to_scaled(read::get_attribute_data(parameters, { "y1=\"" }), 0.0);
 	const double x2 = read::to_scaled(read::get_attribute_data(parameters, { "x2=\"" }), 0.0);
@@ -519,6 +524,11 @@ void draw::line(Transform_Matrix transform_matrix, std::string_view parameters, 
 
 void draw::rect(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
+	const std::string_view transform_data = get_attribute_data(parameters, { "transform=\"" });
+	if (transform_data != "") {
+		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
+	}
+
 	const double x = read::to_scaled(read::get_attribute_data(parameters, { "x=\"" }), 0.0);
 	const double y = read::to_scaled(read::get_attribute_data(parameters, { "y=\"" }), 0.0);
 	const double width = read::to_scaled(read::get_attribute_data(parameters, { "width=\"" }), 0.0);
@@ -583,6 +593,11 @@ void draw::rect(Transform_Matrix transform_matrix, std::string_view parameters, 
 
 void draw::circle(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
+	const std::string_view transform_data = get_attribute_data(parameters, { "transform=\"" });
+	if (transform_data != "") {
+		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
+	}
+
 	const double cx = read::to_scaled(read::get_attribute_data(parameters, { "cx=\"" }), 0.0);
 	const double cy = read::to_scaled(read::get_attribute_data(parameters, { "cy=\"" }), 0.0);
 	const double r  = read::to_scaled(read::get_attribute_data(parameters, { "r=\"" }), 0.0);
@@ -596,6 +611,11 @@ void draw::circle(Transform_Matrix transform_matrix, std::string_view parameters
 
 void draw::ellypse(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
+	const std::string_view transform_data = get_attribute_data(parameters, { "transform=\"" });
+	if (transform_data != "") {
+		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
+	}
+
 	const double cx = read::to_scaled(read::get_attribute_data(parameters, { "cx=\"" }), 0.0);
 	const double cy = read::to_scaled(read::get_attribute_data(parameters, { "cy=\"" }), 0.0);
 	const double rx = read::to_scaled(read::get_attribute_data(parameters, { "rx=\"" }), 0.0);
@@ -610,20 +630,56 @@ void draw::ellypse(Transform_Matrix transform_matrix, std::string_view parameter
 
 void draw::polyline(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	std::cout << "male polyline: " << parameters << '\n';
-	std::cout << "mit matrix " << transform_matrix << '\n';
+	const std::string_view transform_data = get_attribute_data(parameters, { "transform=\"" });
+	if (transform_data != "") {
+		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
+	}
+
+	const std::string_view points_view = get_attribute_data(parameters, { "points=\"" });
+	const std::vector<double> points = from_csv(points_view);
+	assert(points.size() % 2 == 0);
+
+	Vec2D start = transform_matrix * Vec2D{ points[0], points[1] };
+	go_to(start);
+	for (std::size_t i = 2; i < points.size(); i += 2) {
+		const Vec2D end = transform_matrix * Vec2D{ points[i], points[i + 1] };
+		path_line(start, end);
+		start = end;
+	}
 }
 
 void draw::polygon(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	std::cout << "male polygon: " << parameters << '\n';
-	std::cout << "mit matrix " << transform_matrix << '\n';
+	const std::string_view transform_data = get_attribute_data(parameters, { "transform=\"" });
+	if (transform_data != "") {
+		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
+	}
+
+	const std::string_view points_view = get_attribute_data(parameters, { "points=\"" });
+	const std::vector<double> points = from_csv(points_view);
+	assert(points.size() % 2 == 0);
+
+	Vec2D start = transform_matrix * Vec2D{ points[0], points[1] };
+	Vec2D end; 
+	go_to(start);
+	for (std::size_t i = 2; i < points.size(); i += 2) {
+		end = transform_matrix * Vec2D{ points[i], points[i + 1] };
+		path_line(start, end);
+		start = end;
+	}
+	end = transform_matrix * Vec2D{ points[0], points[1] };	//polygon is closed -> last operation is to connect to first point
+	path_line(start, end);
 }
 
 void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	std::cout << "male path: " << parameters << '\n';
-	std::cout << "mit matrix " << transform_matrix << '\n';
+	const std::string_view transform_data = get_attribute_data(parameters, { "transform=\"" });
+	if (transform_data != "") {
+		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
+	}
+
+	const std::string_view data = get_attribute_data(parameters, { "data=\"" });
+	// hier muss noch inhalt hin <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <--
 }
 
 void draw::arc(Vec2D center, double rx, double ry, double start_angle, double end_angle, bool mathematical_positive, std::size_t resolution)

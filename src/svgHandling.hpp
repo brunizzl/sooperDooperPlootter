@@ -161,6 +161,37 @@ namespace read {
 
 
 
+namespace path {
+
+	//all path elements can ether be specified relative to the last coordinate (lower case)
+	//or in absolute coordinates (upper case)
+	enum class Path_Elem
+	{
+		move,					 //M
+		vertical_line,			 //V
+		horizontal_line,		 //H
+		line,					 //L
+		arc,					 //A
+		quadratic_bezier,		 //Q
+		cubic_bezier,			 //C
+		closed,					 //Z
+	};
+
+	struct Path_Elem_data
+	{
+		//quite exactly analogous to read::Elem_Data
+		std::string_view content;
+		Path_Elem type;
+		bool absolute_coords;
+	};
+
+	//quite exactly analogous to read::next_elem()
+	Path_Elem_data next_elem(std::string_view view);
+}
+
+
+
+
 //resolution in draw() determines in how many straight lines the shape is split
 //transform in draw() is matrix needed to transform from current coordinate system to board system
 namespace draw {
