@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
-    <g transform="translate(100, 100)">
-        <g style="stroke:#008800; stroke-width: 3; fill: none">
-            <line x1="0" y1="0" x2="200" y2="0"/>
-            <g transform="rotate(5)" style="stroke:#ff0000; stroke-width: 3; fill: none">
-                <line x1="0" y1="0" x2="200" y2="0"/>
-                <!--<path d="M100,100 A50,20 0 1,1 200,200"/>-->
+    <g transform="translate(-10,-20)">
+        <g transform="scale(2)">
+            <g transform="rotate(45)">
+                <g transform="translate(5,10)">
+                    <!-- graphics elements go here -->
+                </g>
             </g>
         </g>
     </g>

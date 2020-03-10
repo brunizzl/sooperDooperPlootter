@@ -16,6 +16,9 @@ constexpr double pi = 3.1415926535897932384626433832795028841971;
 // board_width and board_height are the dimensions of the board the plotter draws on in mm
 void draw_from_file(const char* const name, double board_width, double board_height);
 
+//assumes str to hold svg and removes everything between "<!--" and "-->"
+void remove_comments(std::string& str);
+
 //the svg standard allows for view boxes to be defined inside other view boxes.
 //this forces an implementation of the complete standard to not save the view box as rectangle, but as polygon.
 //also there may be multible instances of view boxes.
@@ -24,7 +27,8 @@ namespace view_box {
 	extern Vec2D min;	//upper left corner of box
 	extern Vec2D max;	//lower right corner of box
 
-	extern const Vec2D outside;	//returned to signal the coordinates may not be displayed (not headed torwards)
+	//returned to signal the coordinates may not be displayed (not headed torwards) or as some other error state
+	constexpr Vec2D outside{ std::numeric_limits<double>::max(), std::numeric_limits<double>::max() };	
 
 	void set(std::string_view data);
 }
@@ -56,12 +60,13 @@ Vec2D to_board_system(const Transform_Matrix& transform, Vec2D point);
 Transform_Matrix translate(Vec2D t);
 Transform_Matrix scale(double sx, double sy);
 Transform_Matrix rotate(double angle);	//angle in rad
-Transform_Matrix rotate(double angle, Vec2D pivot);	//angle in rad
+Transform_Matrix rotate(double angle, Vec2D pivot);	//angle in rad (but stored in svg as degree)
 Transform_Matrix skew_x(double angle);
 Transform_Matrix skew_y(double angle);
 
 enum class Transform
 {
+	matrix,
 	translate,
 	scale,
 	rotate,
@@ -70,6 +75,9 @@ enum class Transform
 };
 
 std::string_view name_of(Transform transform);
+
+static const Transform all_transforms[] = { Transform::matrix, Transform::translate, Transform::scale,
+	Transform::rotate, Transform::skew_x, Transform::skew_y, };
 
 //all functions used while parsing/reading
 namespace read {
@@ -104,7 +112,7 @@ namespace read {
 
 	std::string_view end_marker(Elem_Type type);
 
-	std::size_t find_skip_quotations(std::string_view search_zone, std::string_view find);
+	std::size_t find_skip_quotations(std::string_view search_zone, std::string_view find, std::size_t start = 0);
 
 	struct Elem_Data
 	{
@@ -116,8 +124,9 @@ namespace read {
 	};
 
 	//returns view to the part of content describing your attribute
-	//example: std::string_view("cx=\"100\" cy=\"200\" r=\"20\"").get_attribute_data("cx") 
+	//example: std::string_view("cx=\"100\" cy=\"200\" r=\"20\"").get_attribute_data("cx=\"") 
 	//  yields "100", as this is specified after "cx=\""
+	//if attr_name is not found, "" is returned
 	std::string_view get_attribute_data(std::string_view search_zone, std::string_view attr_name);
 
 	//multiple commas/ spaces and combinations thereof are read in as a single seperator.
@@ -130,9 +139,6 @@ namespace read {
 		/*em, ex,*/ px, pt, pc, mm, cm, in,
 	};
 
-	//helper for to_scaled()
-	double to_pixel(Unit unit);
-
 	//returns unit code as string view. example: name_of(Unit::cm) yields "cm"
 	std::string_view name_of(Unit unit);
 
@@ -140,7 +146,8 @@ namespace read {
 	//example: to_scaled("100")   yields 100.0
 	//         to_scaled("100cm") yields 3543.307
 	//if a unit is not implemented here (the relative ones), the function returns unknown_unit constant 
-	double to_scaled(std::string_view val_str);
+	//if val_str turns out to be empty, default_val is returned
+	double to_scaled(std::string_view val_str, double default_val = 0);
 
 	extern const double unknown_unit;
 
@@ -152,80 +159,24 @@ namespace read {
 	void evaluate_fragment(std::string_view fragment, const Transform_Matrix& transform);
 
 	//returns matrix resulting from transformation attributes of group specified in group attributes
-	Transform_Matrix group_transform(std::string_view group_attributes);
+	Transform_Matrix get_transform_matrix(std::string_view group_attributes);
 }
 
 
 
 
-//all lengths in mm, angles in rad
 //resolution in draw() determines in how many straight lines the shape is split
 //transform in draw() is matrix needed to transform from current coordinate system to board system
-namespace shape {
+namespace draw {
 
-	//straight line from start to end
-	struct Line
-	{
-		Vec2D start;
-		Vec2D end;
-
-		void draw(const Transform_Matrix& transform) const;
-	};
-
-	struct Rectangle
-	{
-		Vec2D upper_left;	//position of upper left corner
-		double height;
-		double width;
-		double radius_x;		//corners may be rounded of by a quarter ellypse (== Arc)
-		double radius_y;
-
-		void draw(const Transform_Matrix& transform, std::size_t resolution) const;
-	};
-
-	struct Circle
-	{
-		Vec2D center;
-		double radius;
-
-		void draw(const Transform_Matrix& transform, std::size_t resolution) const;
-	};
-
-	struct Ellypse
-	{
-		Vec2D center;
-		double radius_x;
-		double radius_y;
-
-		void draw(const Transform_Matrix& transform, std::size_t resolution) const;
-	};
-
-	struct Arc
-	{
-		Ellypse ellypse;
-		double start_angle;
-		double end_angle;
-		bool draw_positive;	//if true, the plotter moves around center of ellypse in mathematical positive direction (counterclockwise)
-
-		void draw(const Transform_Matrix& transform, std::size_t resolution) const;
-	};
-
-	struct Quadratic_Bezier
-	{
-		Vec2D start;
-		Vec2D control;
-		Vec2D end;
-
-		void draw(const Transform_Matrix& transform, std::size_t resolution) const;
-	};
-
-	struct Cubic_Bezier
-	{
-		Vec2D start;
-		Vec2D control_1;
-		Vec2D control_2;
-		Vec2D end;
-
-		void draw(const Transform_Matrix& transform, std::size_t resolution) const;
-	};
+	void line				(Transform_Matrix transform, std::string_view parameters, std::size_t resolution = 10);
+	void rect				(Transform_Matrix transform, std::string_view parameters, std::size_t resolution = 10);
+	void circle				(Transform_Matrix transform, std::string_view parameters, std::size_t resolution = 10);
+	void ellypse			(Transform_Matrix transform, std::string_view parameters, std::size_t resolution = 10);
+	void arc				(Transform_Matrix transform, std::string_view parameters, std::size_t resolution = 10);
+	void quadratic_bezier	(Transform_Matrix transform, std::string_view parameters, std::size_t resolution = 10);
+	void cubic_bezier		(Transform_Matrix transform, std::string_view parameters, std::size_t resolution = 10);
+	void path				(Transform_Matrix transform, std::string_view parameters, std::size_t resolution = 10);
+	void polyline			(Transform_Matrix transform, std::string_view parameters, std::size_t resolution = 10);
+	void polygon			(Transform_Matrix transform, std::string_view parameters, std::size_t resolution = 10);
 }
