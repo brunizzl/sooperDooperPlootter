@@ -359,8 +359,6 @@ double read::to_scaled(std::string_view name, double default_val)
 	return result;
 }
 
-const double read::unknown_unit = std::numeric_limits<double>::max();
-
 Elem_Data read::next_elem(std::string_view view)
 {
 	const std::size_t open_bracket = find_skip_quotations(view, "<");

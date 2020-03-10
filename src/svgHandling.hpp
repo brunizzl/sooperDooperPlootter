@@ -145,8 +145,6 @@ namespace read {
 	//if val_str turns out to be empty, default_val is returned
 	double to_scaled(std::string_view val_str, double default_val = 0);
 
-	extern const double unknown_unit;
-
 	static const Unit all_units[] = { Unit::px, Unit::pt, Unit::pc, Unit::mm, Unit::cm, Unit::in };
 
 	Elem_Data next_elem(std::string_view view);
