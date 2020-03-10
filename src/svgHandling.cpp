@@ -120,9 +120,8 @@ void draw_from_file(const char* const name, double board_width, double board_hei
 		view_box::set(view_box_data);
 	}
 	//creating transformation to display viewbox in board coordinate system (mm)
-	//DAS IST VIELLEITCH NOCH ABSOLUT NICHT KORREKT BITTE TESTEN BITTE TESTEN BITTE TESTEN BITTE TESTEN BITTE TESTEN BITTE TESTEN BITTE TESTEN BITTE TESTEN
-	//const double stretching_factor = std::min(board_width / (view_box::max.x - view_box::min.x), board_height / (view_box::max.y - view_box::min.y));
-	Transform_Matrix to_board = scale(1, 1);
+	//hier muss noch die richtige transformation von zum board hin (inklusive translation) <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <--
+	Transform_Matrix to_board = scale(1, 1) * translate({ 0.0, 0.0 });
 
 	read::evaluate_fragment(str_view, to_board);
 }
@@ -296,16 +295,18 @@ std::size_t read::find_skip_quotations(std::string_view search_zone, std::string
 
 std::string_view read::get_attribute_data(std::string_view search_zone, std::string_view attr_name)
 {
-	const std::size_t found = find_skip_quotations(search_zone, attr_name);
-	if (found == std::string::npos) {
-		return "";
-	}
-	else {
-		search_zone.remove_prefix(found + attr_name.length());
+	std::size_t found = find_skip_quotations(search_zone, attr_name);
+	while (found != std::string::npos) {
+		if (found != 0 && (search_zone[found - 1] == ' ' || search_zone[found - 1] == ',') || found == 0) {	//guarantee that attr_name is not just suffix of some other atribute
+			search_zone.remove_prefix(found + attr_name.length());
 
-		const size_t closing_quote = search_zone.find_first_of('\"');
-		return shorten_to(search_zone, closing_quote);
+			const size_t closing_quote = search_zone.find_first_of('\"');
+			return shorten_to(search_zone, closing_quote);
+		}
+		search_zone.remove_prefix(found + 1); 
+		found = find_skip_quotations(search_zone, attr_name);
 	}
+	return { "" };
 }
 
 std::vector<double> read::from_csv(std::string_view csv)
@@ -353,7 +354,7 @@ double read::to_scaled(std::string_view name, double default_val)
 				return result * to_pixel(unit);
 			}
 		}
-		return unknown_unit;
+		//hier muesste noch fehlerbehandlung falls ne nicht bekannte einheit genutzt wird hin <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <--
 	}
 	return result;
 }
@@ -402,8 +403,8 @@ void read::evaluate_fragment(std::string_view fragment, const Transform_Matrix& 
 				const std::size_t nested_svg_end = find_closing_elem(fragment, { "<svg " }, { "</svg>" });
 				const std::string_view nested_svg_fragment = { fragment.data(), nested_svg_end };
 
-				const double x_offset = to_scaled(get_attribute_data(current.content, "x=\""), 0.0);
-				const double y_offset = to_scaled(get_attribute_data(current.content, "y=\""), 0.0);
+				const double x_offset = to_scaled(get_attribute_data(current.content, { "x=\"" }), 0.0);
+				const double y_offset = to_scaled(get_attribute_data(current.content, { "y=\"" }), 0.0);
 				const Transform_Matrix nested_matrix = transform * translate({ x_offset, y_offset });
 
 				evaluate_fragment(nested_svg_fragment, nested_matrix);

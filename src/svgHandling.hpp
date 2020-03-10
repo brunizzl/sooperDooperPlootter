@@ -195,14 +195,15 @@ namespace path {
 //resolution in draw() determines in how many straight lines the shape is split
 //transform in draw() is matrix needed to transform from current coordinate system to board system
 namespace draw {
+	constexpr std::size_t default_res = 3;
 
-	void line				(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = 100);
-	void rect				(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = 100);
-	void circle				(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = 100);
-	void ellypse			(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = 100);
-	void polyline			(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = 100);
-	void polygon			(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = 100);
-	void path				(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = 100);
+	void line				(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void rect				(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void circle				(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void ellypse			(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void polyline			(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void polygon			(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void path				(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
 
 	//the following functions are called mostly from path()
 	//IMPORTANT: all lengths and vectors are assumed to already be transformed.
@@ -211,9 +212,9 @@ namespace draw {
 	//if mathematical_positive is true, the arc from start to end turning counterclockwise is drawn, clockwise if false
 	//angles are expected to be in rad
 	void arc(Vec2D center, double rx, double ry, double start_angle, double end_angle, 
-		bool mathematical_positive, std::size_t resolution = 100);
+		bool mathematical_positive, std::size_t resolution = default_res);
 
-	void path_line(Vec2D start, Vec2D end, std::size_t resolution = 100);
-	void quadratic_bezier(Vec2D start, Vec2D control, Vec2D end, std::size_t resolution = 100);
-	void cubic_bezier(Vec2D start, Vec2D control_1, Vec2D control_2, Vec2D end, std::size_t resolution = 100);
+	void path_line(Vec2D start, Vec2D end, std::size_t resolution = default_res);
+	void quadratic_bezier(Vec2D start, Vec2D control, Vec2D end, std::size_t resolution = default_res);
+	void cubic_bezier(Vec2D start, Vec2D control_1, Vec2D control_2, Vec2D end, std::size_t resolution = default_res);
 }
