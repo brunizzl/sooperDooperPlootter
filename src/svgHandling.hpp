@@ -172,7 +172,7 @@ namespace path {
 		horizontal_line,		 //Hh
 		line,					 //Ll
 		arc,					 //Aa
-		quadratic_bezier,		 //Qq or Tt
+		quadr_bezier,		     //Qq or Tt
 		cubic_bezier,			 //Cc or Ss
 		closed,					 //Zz
 		end,          //used to say there are no more path elements
@@ -188,6 +188,11 @@ namespace path {
 
 	//returns Path_Elem_Data of next element and shortens view to after the current element
 	Path_Elem_data take_next_elem(std::string_view& view);
+
+	//do the drawing of as much bezier curves as data can deliver
+	//return where they finnished drawing.
+	Vec2D process_quadr_bezier(Path_Elem_data data, Vec2D previous);
+	Vec2D process_cubic_bezier(Path_Elem_data data, Vec2D previous);
 }
 
 
@@ -216,6 +221,6 @@ namespace draw {
 		bool mathematical_positive, std::size_t resolution = default_res);
 
 	void path_line(Vec2D start, Vec2D end, std::size_t resolution = default_res);
-	void quadratic_bezier(Vec2D start, Vec2D control, Vec2D end, std::size_t resolution = default_res);
+	void quadr_bezier(Vec2D start, Vec2D control, Vec2D end, std::size_t resolution = default_res);
 	void cubic_bezier(Vec2D start, Vec2D control_1, Vec2D control_2, Vec2D end, std::size_t resolution = default_res);
 }

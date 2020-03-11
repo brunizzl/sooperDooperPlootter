@@ -566,7 +566,7 @@ Path_Elem_data path::take_next_elem(std::string_view& view)
 	case 't':
 		snd_letter_pos = view.find_first_of("MmVvHhLlAaCcSsZz", snd_letter_pos + 1);	//QqTt is missing
 		content = in_between(view, fst_letter_pos - 1, snd_letter_pos);	//-1 as bezier needs to know what kind
-		result = { content, Path_Elem::quadratic_bezier, false };		//attention: it is not recorded, whether the first curve is really given in relative coords
+		result = { content, Path_Elem::quadr_bezier, false };		//attention: it is not recorded, whether the first curve is really given in relative coords
 		break;
 	case 'C':
 	case 'c':
@@ -588,6 +588,16 @@ Path_Elem_data path::take_next_elem(std::string_view& view)
 	else view.remove_prefix(snd_letter_pos + 1);
 
 	return result;
+}
+
+Vec2D path::process_quadr_bezier(Path_Elem_data data, Vec2D previous)
+{
+	return previous; //<-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- 
+}
+
+Vec2D path::process_cubic_bezier(Path_Elem_data data, Vec2D previous)
+{
+	return previous; //<-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- 
 }
 
 
@@ -777,7 +787,7 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 
 	while (current_elem.type != Path_Elem::end) {
 		std::vector<double> data;
-		if (current_elem.type != Path_Elem::quadratic_bezier && current_elem.type != Path_Elem::cubic_bezier) {
+		if (current_elem.type != Path_Elem::quadr_bezier && current_elem.type != Path_Elem::cubic_bezier) {
 			data = from_csv(current_elem.content);
 		}
 
@@ -841,13 +851,15 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 			new_subpath = false;
 			break;
 
-		case Path_Elem::arc:
+		case Path_Elem::arc: //<-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- 
 			new_subpath = false;
 			break;
-		case Path_Elem::quadratic_bezier:
+		case Path_Elem::quadr_bezier: 
+			previous = process_quadr_bezier(current_elem, previous);
 			new_subpath = false;
 			break;
 		case Path_Elem::cubic_bezier:
+			previous = process_cubic_bezier(current_elem, previous);
 			new_subpath = false;
 			break;
 		case Path_Elem::closed:
@@ -881,7 +893,7 @@ void draw::path_line(Vec2D start, Vec2D end, std::size_t resolution)
 	}
 }
 
-void draw::quadratic_bezier(Vec2D start, Vec2D control, Vec2D end, std::size_t resolution)
+void draw::quadr_bezier(Vec2D start, Vec2D control, Vec2D end, std::size_t resolution)
 {
 	for (std::size_t step = 1; step <= resolution; step++) {
 		//formula taken from https://en.wikipedia.org/wiki/B%C3%A9zier_curve#Quadratic_B%C3%A9zier_curves
