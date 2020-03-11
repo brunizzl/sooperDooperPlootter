@@ -92,6 +92,18 @@ double to_pixel(read::Unit unit)
 	return 0.0;
 }
 
+//returns part of original in between fst and snd
+//if snd is std::string::npos, the view from after fst to end is returned.
+std::string_view in_between(std::string_view original, std::size_t fst, std::size_t snd)
+{
+	if (snd != std::string::npos) {
+		return { original.data() + fst + 1, snd - fst - 1 };
+	}
+	else {
+		return { original.data() + fst + 1, original.length() - fst - 1 };
+	}
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////functions visible from the outside//////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -109,7 +121,7 @@ void draw_from_file(const char* const name, double board_width, double board_hei
 
 		str.assign((std::istreambuf_iterator<char>(filestream)), std::istreambuf_iterator<char>());
 	}
-	remove_comments(str);
+	preprocess_str(str);
 	std::cout << str << std::endl;
 
 	std::string_view str_view = { str.c_str(), str.length() };
@@ -126,7 +138,7 @@ void draw_from_file(const char* const name, double board_width, double board_hei
 	read::evaluate_fragment(str_view, to_board);
 }
 
-void remove_comments(std::string& str)
+void preprocess_str(std::string& str)
 {
 	std::size_t comment_start = str.find("<!--");
 	while (comment_start != std::string::npos) {
@@ -134,6 +146,22 @@ void remove_comments(std::string& str)
 		str.erase(comment_start, comment_length);
 		comment_start = str.find("<!--", comment_start);
 	}
+
+	//this part is mainly, because the path attribute may include newlines. 
+	bool inside_quotes = false;
+	for (char& ch : str) {
+		switch (ch) {
+		case '\"':
+			inside_quotes = !inside_quotes;
+			break;
+		case '\n':
+			if (inside_quotes) {
+				ch = ' ';
+			}
+			break;
+		}
+	}
+	assert(!inside_quotes);	//there should be an even number of '\"' in the string.
 }
 
 Vec2D view_box::min = { 0, 0 };
@@ -297,6 +325,7 @@ std::string_view read::get_attribute_data(std::string_view search_zone, std::str
 {
 	std::size_t found = find_skip_quotations(search_zone, attr_name);
 	while (found != std::string::npos) {
+		//this is very trashy and may be changed later. i am aware of that
 		if (found != 0 && (search_zone[found - 1] == ' ' || search_zone[found - 1] == ',') || found == 0) {	//guarantee that attr_name is not just suffix of some other atribute
 			search_zone.remove_prefix(found + attr_name.length());
 
@@ -321,7 +350,9 @@ std::vector<double> read::from_csv(std::string_view csv)
 		next_seperator = csv.find_first_of(", ");
 	}
 
-	result.push_back(to_scaled(csv));
+	if (csv != "") {
+		result.push_back(to_scaled(csv));
+	}
 
 	result.shrink_to_fit();
 	return result;
@@ -425,7 +456,7 @@ void read::evaluate_fragment(std::string_view fragment, const Transform_Matrix& 
 		case Elem_Type::polygon:	draw::polygon(transform, current.content);	break;
 		case Elem_Type::rect:		draw::rect(transform, current.content);		break;
 		case Elem_Type::ellypse:	draw::ellypse(transform, current.content);	break;
-		case Elem_Type::circle:		draw::circle(transform, current.content);		break;
+		case Elem_Type::circle:		draw::circle(transform, current.content);	break;
 		case Elem_Type::path:		draw::path(transform, current.content);		break;
 		}
 
@@ -502,6 +533,67 @@ Transform_Matrix read::get_transform_matrix(std::string_view group_attributes)
 	}
 	return result_matrix;
 }
+
+
+
+
+using namespace path;
+
+Path_Elem_data path::take_next_elem(std::string_view& view)
+{
+	const std::size_t fst_letter_pos = view.find_first_of("MmVvHhLlAaQqTtCcSsZz");
+	if (fst_letter_pos == std::string::npos) {
+		return { "", Path_Elem::end, false };
+	}
+	std::size_t snd_letter_pos = view.find_first_of("MmVvHhLlAaQqTtCcSsZz", fst_letter_pos + 1);
+	std::string_view content = in_between(view, fst_letter_pos, snd_letter_pos);
+	Path_Elem_data result;
+
+	switch (view[fst_letter_pos]) {
+	case 'M': result = { content, Path_Elem::move, true };				break;
+	case 'm': result = { content, Path_Elem::move, false };				break;
+	case 'V': result = { content, Path_Elem::vertical_line, true };		break;
+	case 'v': result = { content, Path_Elem::vertical_line, false };	break;
+	case 'H': result = { content, Path_Elem::horizontal_line, true };	break;
+	case 'h': result = { content, Path_Elem::horizontal_line, false };	break;
+	case 'L': result = { content, Path_Elem::line, true };				break;
+	case 'l': result = { content, Path_Elem::line, false };				break;
+	case 'A': result = { content, Path_Elem::arc, true };				break;
+	case 'a': result = { content, Path_Elem::arc, false };				break;
+	case 'Q':
+	case 'q':
+	case 'T':
+	case 't':
+		snd_letter_pos = view.find_first_of("MmVvHhLlAaCcSsZz", snd_letter_pos + 1);	//QqTt is missing
+		content = in_between(view, fst_letter_pos - 1, snd_letter_pos);	//-1 as bezier needs to know what kind
+		result = { content, Path_Elem::quadratic_bezier, false };		//attention: it is not recorded, whether the first curve is really given in relative coords
+		break;
+	case 'C':
+	case 'c':
+	case 'S':
+	case 's':
+		snd_letter_pos = view.find_first_of("MmVvHhLlAaQqTtZz", snd_letter_pos + 1); //CcSs is missing
+		content = in_between(view, fst_letter_pos - 1, snd_letter_pos);	//-1 as bezier needs to know what kind
+		result = { content, Path_Elem::cubic_bezier, false };		//attention: it is not recorded, whether the first curve is really given in relative coords
+		break;
+	case 'Z':
+	case 'z':
+		result = { "", Path_Elem::closed, false };
+		break;
+	default:
+		assert(false);
+	}
+
+	if (snd_letter_pos == std::string::npos) view = "";
+	else view.remove_prefix(snd_letter_pos + 1);
+
+	return result;
+}
+
+
+
+
+using namespace draw;
 
 void draw::line(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
@@ -677,8 +769,95 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
 	}
 
-	const std::string_view data = get_attribute_data(parameters, { "data=\"" });
-	// hier muss noch inhalt hin <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <--
+	std::string_view data_view = get_attribute_data(parameters, { "data=\"" });
+	Vec2D previous = { 0.0, 0.0 };	//as a path always continues from the last point, this is the point the last path element ended (this is not yet transformed)
+	Vec2D current_subpath_begin = { 0.0, 0.0 };
+	bool new_subpath = true;
+	Path_Elem_data current_elem = take_next_elem(data_view);
+
+	while (current_elem.type != Path_Elem::end) {
+		std::vector<double> data;
+		if (current_elem.type != Path_Elem::quadratic_bezier && current_elem.type != Path_Elem::cubic_bezier) {
+			data = from_csv(current_elem.content);
+		}
+
+		switch (current_elem.type) {
+		case Path_Elem::move:
+			assert(data.size() % 2 == 0);
+			{
+				//only the first two coordinates are moved to, the rest are implicit line commands
+				const Vec2D current = current_elem.absolute_coords ?
+					Vec2D{ data[0], data[1] } :
+					previous + Vec2D{ data[0], data[1] };
+				go_to(transform_matrix * current);
+				previous = current;
+				if (new_subpath) {
+					current_subpath_begin = previous;
+				}
+			}
+			for (std::size_t i = 2; i < data.size(); i += 2) {
+				const Vec2D current = current_elem.absolute_coords ?
+					Vec2D{ data[i], data[i + 1] } :
+					previous + Vec2D{ data[i], data[i + 1] };
+				draw::path_line(transform_matrix * previous, transform_matrix * current);
+				previous = current;
+			}
+			new_subpath = false;
+			break;
+
+		case Path_Elem::vertical_line:
+			{
+				//although that makes no sense, there can be multiple vertical lines stacked -> we directly draw to the end
+				const Vec2D current = current_elem.absolute_coords ?
+					Vec2D{ previous.x, data.back() } :
+					Vec2D{ previous.x, previous.y + data.back() };
+				draw::path_line(transform_matrix * previous, transform_matrix * current);
+				previous = current;
+			}
+			new_subpath = false;
+			break;
+
+		case Path_Elem::horizontal_line:
+			{
+				//although that makes no sense, there can be multiple horizontal lines stacked -> we directly draw to the end
+				const Vec2D current = current_elem.absolute_coords ?
+					Vec2D{ data.back(), previous.y } :
+					Vec2D{ previous.x + data.back(), previous.y };
+				draw::path_line(transform_matrix * previous, transform_matrix * current);
+				previous = current;
+			}
+			new_subpath = false;
+			break;
+
+		case Path_Elem::line:
+			assert(data.size() % 2 == 0);
+			for (std::size_t i = 0; i < data.size(); i += 2) {
+				const Vec2D current = current_elem.absolute_coords ? 
+					Vec2D{ data[i], data[i + 1] } : 
+					previous + Vec2D{ data[i], data[i + 1] };
+				draw::path_line(transform_matrix * previous, transform_matrix * current);
+				previous = current;
+			}
+			new_subpath = false;
+			break;
+
+		case Path_Elem::arc:
+			new_subpath = false;
+			break;
+		case Path_Elem::quadratic_bezier:
+			new_subpath = false;
+			break;
+		case Path_Elem::cubic_bezier:
+			new_subpath = false;
+			break;
+		case Path_Elem::closed:
+			draw::path_line(transform_matrix * previous, transform_matrix * current_subpath_begin);
+			//current_subpath_begin is same as begin of last (just finished) subpath, but may be changed from directly following move command
+			new_subpath = true;
+			break;
+		}
+		current_elem = take_next_elem(data_view);
+	}
 }
 
 void draw::arc(Vec2D center, double rx, double ry, double start_angle, double end_angle, bool mathematical_positive, std::size_t resolution)

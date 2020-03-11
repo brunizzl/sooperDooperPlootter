@@ -9,10 +9,13 @@ struct Vec2D
 	double y;
 };
 
+//constexpr Vec2D no_value = { std::numeric_limits<double>::max(), std::numeric_limits<double>::max() };
+
 Vec2D operator+(const Vec2D a, const Vec2D b);
 Vec2D operator-(const Vec2D a, const Vec2D b);
 Vec2D operator-(const Vec2D a);
 Vec2D operator*(const double factor, const Vec2D vec);
+bool operator==(const Vec2D a, const Vec2D b);
 
 std::ostream& operator<<(std::ostream& stream, const Vec2D& coord);
 

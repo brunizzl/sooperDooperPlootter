@@ -16,8 +16,9 @@ constexpr double pi = 3.1415926535897932384626433832795028841971;
 // board_width and board_height are the dimensions of the board the plotter draws on in mm
 void draw_from_file(const char* const name, double board_width, double board_height);
 
-//assumes str to hold svg and removes everything between "<!--" and "-->"
-void remove_comments(std::string& str);
+//assumes str to hold svg and removes comments (everything between "<!--" and "-->")
+//also swaps out newlines within quotes to spaces ("...d=\"M100 100 \n L20 30...\"..." becomes "...d=\"M100 100   L20 30...\"...")
+void preprocess_str(std::string& str);
 
 //the svg standard allows for view boxes to be defined inside other view boxes.
 //this forces an implementation of the complete standard to not save the view box as rectangle, but as polygon.
@@ -163,28 +164,30 @@ namespace path {
 
 	//all path elements can ether be specified relative to the last coordinate (lower case)
 	//or in absolute coordinates (upper case)
+	//see documentation here https://www.w3.org/TR/SVG11/paths.html#PathElement
 	enum class Path_Elem
 	{
-		move,					 //M
-		vertical_line,			 //V
-		horizontal_line,		 //H
-		line,					 //L
-		arc,					 //A
-		quadratic_bezier,		 //Q
-		cubic_bezier,			 //C
-		closed,					 //Z
+		move,					 //Mm
+		vertical_line,			 //Vv
+		horizontal_line,		 //Hh
+		line,					 //Ll
+		arc,					 //Aa
+		quadratic_bezier,		 //Qq or Tt
+		cubic_bezier,			 //Cc or Ss
+		closed,					 //Zz
+		end,          //used to say there are no more path elements
 	};
 
 	struct Path_Elem_data
 	{
 		//quite exactly analogous to read::Elem_Data
 		std::string_view content;
-		Path_Elem type;
-		bool absolute_coords;
+		Path_Elem type = Path_Elem::end;
+		bool absolute_coords = false;
 	};
 
-	//quite exactly analogous to read::next_elem()
-	Path_Elem_data next_elem(std::string_view view);
+	//returns Path_Elem_Data of next element and shortens view to after the current element
+	Path_Elem_data take_next_elem(std::string_view& view);
 }
 
 
