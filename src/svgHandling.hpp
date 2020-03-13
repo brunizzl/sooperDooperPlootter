@@ -85,7 +85,7 @@ namespace read {
 	{
 		//containers
 		svg, 
-		g,			//group
+		g,			//standing for group
 
 		//shapes
 		line,
@@ -109,6 +109,7 @@ namespace read {
 
 	std::string_view end_marker(Elem_Type type);
 
+	//just like search_zone.find(find, start) but ignores everything written in between quotes
 	std::size_t find_skip_quotations(std::string_view search_zone, std::string_view find, std::size_t start = 0);
 
 	struct Elem_Data
@@ -148,7 +149,8 @@ namespace read {
 
 	static const Unit all_units[] = { Unit::px, Unit::pt, Unit::pc, Unit::mm, Unit::cm, Unit::in };
 
-	Elem_Data next_elem(std::string_view view);
+	//returns Elem_Data of next element and shortens view to after the current element
+	Elem_Data take_next_elem(std::string_view& view);
 
 	//reads all of fragment
 	void evaluate_fragment(std::string_view fragment, const Transform_Matrix& transform);
@@ -175,7 +177,7 @@ namespace path {
 		quadr_bezier,		     //Qq or Tt
 		cubic_bezier,			 //Cc or Ss
 		closed,					 //Zz
-		end,          //used to say there are no more path elements
+		end,          //if a path is fully read, "end" is returned as type of next elem
 	};
 
 	//upper case letters stand for the command given in absolute coordinates
@@ -199,8 +201,8 @@ namespace path {
 
 	//do the drawing of as much bezier curves as data can deliver
 	//return where they finnished drawing.
-	Vec2D process_quadr_bezier(Path_Elem_data data, Vec2D previous);
-	Vec2D process_cubic_bezier(Path_Elem_data data, Vec2D previous);
+	Vec2D process_quadr_bezier(Path_Elem_data data, Vec2D current);
+	Vec2D process_cubic_bezier(Path_Elem_data data, Vec2D current);
 
 	//control point is given explicitly -> set to expl
 	//control point is to be calculated from the last control point -> set to impl
@@ -237,7 +239,7 @@ namespace path {
 //resolution in draw() determines in how many straight lines the shape is split
 //transform in draw() is matrix needed to transform from current coordinate system to board system
 namespace draw {
-	constexpr std::size_t default_res = 3;
+	constexpr std::size_t default_res = 1;
 
 	void line				(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
 	void rect				(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
@@ -250,11 +252,17 @@ namespace draw {
 	//the following functions are called mostly from path()
 	//IMPORTANT: all lengths and vectors are assumed to already be transformed.
 
+	enum class Rotation
+	{
+		positive,	//mathematical positive == counterclockwise
+		negative,	//mathematical negative == clockwise
+	};
+
 	//arc is part of ellypse between start_angle and end_angle
 	//if mathematical_positive is true, the arc from start to end turning counterclockwise is drawn, clockwise if false
 	//angles are expected to be in rad
 	void arc(Vec2D center, double rx, double ry, double start_angle, double end_angle, 
-		bool mathematical_positive, std::size_t resolution = default_res);
+		Rotation rotation, std::size_t resolution = default_res);
 
 	void path_line(Vec2D start, Vec2D end, std::size_t resolution = default_res);
 	void quadr_bezier(Vec2D start, Vec2D control, Vec2D end, std::size_t resolution = default_res);
