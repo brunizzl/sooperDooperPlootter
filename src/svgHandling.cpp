@@ -543,30 +543,31 @@ Path_Elem_data path::take_next_elem(std::string_view& view)
 {
 	const std::size_t fst_letter_pos = view.find_first_of("MmVvHhLlAaQqTtCcSsZz");
 	if (fst_letter_pos == std::string::npos) {
-		return { "", Path_Elem::end, false };
+		return { "", Path_Elem::end, Coords_Type::absolute };
 	}
 	std::size_t snd_letter_pos = view.find_first_of("MmVvHhLlAaQqTtCcSsZz", fst_letter_pos + 1);
 	std::string_view content = in_between(view, fst_letter_pos, snd_letter_pos);
 	Path_Elem_data result;
 
 	switch (view[fst_letter_pos]) {
-	case 'M': result = { content, Path_Elem::move, true };				break;
-	case 'm': result = { content, Path_Elem::move, false };				break;
-	case 'V': result = { content, Path_Elem::vertical_line, true };		break;
-	case 'v': result = { content, Path_Elem::vertical_line, false };	break;
-	case 'H': result = { content, Path_Elem::horizontal_line, true };	break;
-	case 'h': result = { content, Path_Elem::horizontal_line, false };	break;
-	case 'L': result = { content, Path_Elem::line, true };				break;
-	case 'l': result = { content, Path_Elem::line, false };				break;
-	case 'A': result = { content, Path_Elem::arc, true };				break;
-	case 'a': result = { content, Path_Elem::arc, false };				break;
+	case 'M': result = { content, Path_Elem::move, Coords_Type::absolute };				break;
+	case 'm': result = { content, Path_Elem::move, Coords_Type::relative };				break;
+	case 'V': result = { content, Path_Elem::vertical_line, Coords_Type::absolute };	break;
+	case 'v': result = { content, Path_Elem::vertical_line, Coords_Type::relative };	break;
+	case 'H': result = { content, Path_Elem::horizontal_line, Coords_Type::absolute };	break;
+	case 'h': result = { content, Path_Elem::horizontal_line, Coords_Type::relative };	break;
+	case 'L': result = { content, Path_Elem::line, Coords_Type::absolute };				break;
+	case 'l': result = { content, Path_Elem::line, Coords_Type::relative };				break;
+	case 'A': result = { content, Path_Elem::arc, Coords_Type::absolute };				break;
+	case 'a': result = { content, Path_Elem::arc, Coords_Type::relative };				break;
 	case 'Q':
 	case 'q':
 	case 'T':
 	case 't':
 		snd_letter_pos = view.find_first_of("MmVvHhLlAaCcSsZz", snd_letter_pos + 1);	//QqTt is missing
 		content = in_between(view, fst_letter_pos - 1, snd_letter_pos);	//-1 as bezier needs to know what kind
-		result = { content, Path_Elem::quadr_bezier, false };		//attention: it is not recorded, whether the first curve is really given in relative coords
+		//attention: it is not recorded, whether the first curve is really given in relative coords
+		result = { content, Path_Elem::quadr_bezier, Coords_Type::absolute };		
 		break;
 	case 'C':
 	case 'c':
@@ -574,11 +575,12 @@ Path_Elem_data path::take_next_elem(std::string_view& view)
 	case 's':
 		snd_letter_pos = view.find_first_of("MmVvHhLlAaQqTtZz", snd_letter_pos + 1); //CcSs is missing
 		content = in_between(view, fst_letter_pos - 1, snd_letter_pos);	//-1 as bezier needs to know what kind
-		result = { content, Path_Elem::cubic_bezier, false };		//attention: it is not recorded, whether the first curve is really given in relative coords
+		//attention: it is not recorded, whether the first curve is really given in relative coords
+		result = { content, Path_Elem::cubic_bezier, Coords_Type::absolute };		
 		break;
 	case 'Z':
 	case 'z':
-		result = { "", Path_Elem::closed, false };
+		result = { "", Path_Elem::closed, Coords_Type::absolute };
 		break;
 	default:
 		assert(false);
@@ -592,12 +594,53 @@ Path_Elem_data path::take_next_elem(std::string_view& view)
 
 Vec2D path::process_quadr_bezier(Path_Elem_data data, Vec2D previous)
 {
-	return previous; //<-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- 
+	//At the end of the command, the new current point becomes the final (x,y) coordinate pair used in the polybézier.
+	Bezier_Data curve = take_next_bezier(data.content);
+	Vec2D previous_control_point = no_value;
+	while (curve.content != "") {
+		const std::vector<double> points = from_csv(curve.content);
+		//<-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- 
+
+		curve = take_next_bezier(data.content);
+	}
+	return previous;
 }
 
 Vec2D path::process_cubic_bezier(Path_Elem_data data, Vec2D previous)
 {
+	//At the end of the command, the new current point becomes the final (x,y) coordinate pair used in the polybézier.
 	return previous; //<-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- 
+}
+
+Vec2D path::calculate_contol_point(Vec2D last_control_point, Vec2D mirror)
+{
+	return 2.0 * mirror - last_control_point;
+}
+
+Bezier_Data path::take_next_bezier(std::string_view& view)
+{
+	const std::size_t identifier_pos = view.find_first_of("CcQqTtSs");
+	if (identifier_pos == std::string::npos) {
+		return { "", Control_Given::expl, Coords_Type::absolute };
+	}
+	const std::size_t next_pos = view.find_first_of("CcQqTtSs", identifier_pos + 1);
+	const std::string_view content = in_between(view, identifier_pos, next_pos);
+	const char identifier = view[identifier_pos];
+
+	if (next_pos == std::string::npos) {
+		view = "";
+	}
+	else {
+		view.remove_prefix(next_pos);
+	}
+	switch (identifier) {
+	case 'C': case 'Q': return { content, Control_Given::expl, Coords_Type::absolute };
+	case 'c': case 'q':	return { content, Control_Given::expl, Coords_Type::relative };
+	case 'T': case 'S':	return { content, Control_Given::impl, Coords_Type::absolute };
+	case 't': case 's':	return { content, Control_Given::impl, Coords_Type::relative };
+	}
+	assert(false);
+	return { "", Control_Given::expl, Coords_Type::absolute };
 }
 
 
@@ -796,7 +839,7 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 			assert(data.size() % 2 == 0);
 			{
 				//only the first two coordinates are moved to, the rest are implicit line commands
-				const Vec2D current = current_elem.absolute_coords ?
+				const Vec2D current = current_elem.coords_type == Coords_Type::absolute ?
 					Vec2D{ data[0], data[1] } :
 					previous + Vec2D{ data[0], data[1] };
 				go_to(transform_matrix * current);
@@ -806,7 +849,7 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 				}
 			}
 			for (std::size_t i = 2; i < data.size(); i += 2) {
-				const Vec2D current = current_elem.absolute_coords ?
+				const Vec2D current = current_elem.coords_type == Coords_Type::absolute ?
 					Vec2D{ data[i], data[i + 1] } :
 					previous + Vec2D{ data[i], data[i + 1] };
 				draw::path_line(transform_matrix * previous, transform_matrix * current);
@@ -818,7 +861,7 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 		case Path_Elem::vertical_line:
 			{
 				//although that makes no sense, there can be multiple vertical lines stacked -> we directly draw to the end
-				const Vec2D current = current_elem.absolute_coords ?
+				const Vec2D current = current_elem.coords_type == Coords_Type::absolute ?
 					Vec2D{ previous.x, data.back() } :
 					Vec2D{ previous.x, previous.y + data.back() };
 				draw::path_line(transform_matrix * previous, transform_matrix * current);
@@ -830,7 +873,7 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 		case Path_Elem::horizontal_line:
 			{
 				//although that makes no sense, there can be multiple horizontal lines stacked -> we directly draw to the end
-				const Vec2D current = current_elem.absolute_coords ?
+				const Vec2D current = current_elem.coords_type == Coords_Type::absolute ?
 					Vec2D{ data.back(), previous.y } :
 					Vec2D{ previous.x + data.back(), previous.y };
 				draw::path_line(transform_matrix * previous, transform_matrix * current);
@@ -841,12 +884,15 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 
 		case Path_Elem::line:
 			assert(data.size() % 2 == 0);
-			for (std::size_t i = 0; i < data.size(); i += 2) {
-				const Vec2D current = current_elem.absolute_coords ? 
-					Vec2D{ data[i], data[i + 1] } : 
-					previous + Vec2D{ data[i], data[i + 1] };
-				draw::path_line(transform_matrix * previous, transform_matrix * current);
-				previous = current;
+			{
+				Vec2D current = { 0.0, 0.0 };
+				for (std::size_t i = 0; i < data.size(); i += 2) {
+					current = current_elem.coords_type == Coords_Type::absolute ?
+						Vec2D{ data[i], data[i + 1] } :
+						previous + Vec2D{ data[i], data[i + 1] };
+					draw::path_line(transform_matrix * previous, transform_matrix * current);
+				}
+				previous = current;	//ws specifies a polyline drawn relative, all are relative to the very start -> only update here
 			}
 			new_subpath = false;
 			break;

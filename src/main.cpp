@@ -10,6 +10,8 @@ int main(int argc, char* argv[])
 	std::string_view test = "halloIbims1Bruno";
 	auto o = test.find_first_of('o');
 	auto B = test.find_first_of('v');
-	std::cout << in_between(test, o, B);
+	std::cout << in_between(test, o, B) << '\n';
+	std::cout << path::calculate_contol_point({ 1, 2 }, { 5, 1 }) << '\n';
+	std::cin.get();
 }
 

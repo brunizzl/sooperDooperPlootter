@@ -178,12 +178,20 @@ namespace path {
 		end,          //used to say there are no more path elements
 	};
 
+	//upper case letters stand for the command given in absolute coordinates
+	//lower case letters stand for the command to be specified relative to the point drawn at the end of the last command
+	enum class Coords_Type
+	{
+		absolute,
+		relative,
+	};
+
 	struct Path_Elem_data
 	{
 		//quite exactly analogous to read::Elem_Data
 		std::string_view content;
 		Path_Elem type = Path_Elem::end;
-		bool absolute_coords = false;
+		Coords_Type coords_type = Coords_Type::absolute;
 	};
 
 	//returns Path_Elem_Data of next element and shortens view to after the current element
@@ -193,6 +201,34 @@ namespace path {
 	//return where they finnished drawing.
 	Vec2D process_quadr_bezier(Path_Elem_data data, Vec2D previous);
 	Vec2D process_cubic_bezier(Path_Elem_data data, Vec2D previous);
+
+	//control point is given explicitly -> set to expl
+	//control point is to be calculated from the last control point -> set to impl
+	//see here how to calculate: https://www.w3.org/TR/SVG11/paths.html#PathDataCurveCommands
+	enum class Control_Given
+	{
+		expl,
+		impl,
+	};
+
+	Vec2D calculate_contol_point(Vec2D last_control_point, Vec2D mirror);
+
+	struct Bezier_Data
+	{
+		//only numbers, no mor letters. ready as is to be plugged into from_csv()
+		std::string_view content;
+
+		//if all points (but the start) are given explicitly, this flag is set to true
+		//-> if 'C', 'c', 'Q' or 'q' are read in, control_data is set to explicit,
+		//-> if 'T', 't', 'S' or 's' are read in, control_data is set to implicit
+		Control_Given control_data = Control_Given::expl;
+		Coords_Type coords_type = Coords_Type::absolute;
+	};
+
+	//returns Bezier_Data specified at start of view & removes prefix of view to start after returned data
+	//if no data is found, content is set to "". 
+	//both quadratic and cubic share this same function
+	Bezier_Data take_next_bezier(std::string_view& view);
 }
 
 

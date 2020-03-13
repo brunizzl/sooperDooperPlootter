@@ -9,7 +9,7 @@ struct Vec2D
 	double y;
 };
 
-//constexpr Vec2D no_value = { std::numeric_limits<double>::max(), std::numeric_limits<double>::max() };
+constexpr Vec2D no_value = { std::numeric_limits<double>::max(), std::numeric_limits<double>::max() };
 
 Vec2D operator+(const Vec2D a, const Vec2D b);
 Vec2D operator-(const Vec2D a, const Vec2D b);
