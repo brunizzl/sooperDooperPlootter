@@ -2,6 +2,8 @@
 
 #include "svgHandling.hpp"
 
+const Vec2D Vec2D::no_value = { std::numeric_limits<double>::max(), std::numeric_limits<double>::max() };
+
 Vec2D operator+(Vec2D a, Vec2D b)
 {
 	return { a.x + b.x, a.y + b.y };

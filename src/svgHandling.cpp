@@ -122,7 +122,7 @@ void draw_from_file(const char* const name, double board_width, double board_hei
 		}
 
 		filestream.seekg(0, std::ios::end);
-		str.resize(filestream.tellg());
+		str.resize(static_cast<const std::size_t>(filestream.tellg()));		//static_cast silences type shortening warning
 		filestream.seekg(0, std::ios::beg);
 		filestream.read(&str[0], str.size());
 	}
@@ -598,24 +598,119 @@ Path_Elem_data path::take_next_elem(std::string_view& view)
 	return result;
 }
 
-Vec2D path::process_quadr_bezier(Path_Elem_data data, Vec2D current)
+//current_point_of_reference is point relative coordiantes are specified relative to.
+//in the begin, this is also the current position of the plotter.
+Vec2D path::process_quadr_bezier(Path_Elem_data data, Vec2D current_point_of_reference)
 {
-	//At the end of the command, the new current point becomes the final (x,y) coordinate pair used in the polybézier.
 	Bezier_Data curve = take_next_bezier(data.content);
-	Vec2D previous_control_point = no_value;
+	Vec2D last_control_point = Vec2D::no_value;
 	while (curve.content != "") {
 		const std::vector<double> points = from_csv(curve.content);
-		//<-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- 
+
+		if (curve.control_data == Control_Given::expl) {
+			assert(points.size() % 4 == 0);
+
+			Vec2D current_pos = current_point_of_reference;		//relevant to draw next bezier, starting at current_pos
+			for (std::size_t i = 0; i < points.size(); i += 4) {
+				const Vec2D control = curve.coords_type == Coords_Type::absolute ?
+					Vec2D{ points[i], points[i + 1] } :
+					current_point_of_reference + Vec2D{ points[i], points[i + 1] };
+
+				const Vec2D end = curve.coords_type == Coords_Type::absolute ?
+					Vec2D{ points[i + 2], points[i + 3] } :
+					current_point_of_reference + Vec2D{ points[i + 2], points[i + 3] };
+
+				draw::quadr_bezier(current_pos, control, end);
+				current_pos = end;
+				last_control_point = control;	//not used in this loop, but the loop for implicit control points
+			}
+			current_point_of_reference = current_pos;	//polybezier is finished -> current position becomes new point of reference for relative coords
+		}
+		if (curve.control_data == Control_Given::impl) {
+			assert(points.size() % 2 == 0);
+			if (last_control_point == Vec2D::no_value) {
+				last_control_point = current_point_of_reference;	//current_point_of_reference is also current position
+			}
+
+			Vec2D current_pos = current_point_of_reference;		//relevant to draw next bezier, starting at current_pos
+			for (std::size_t i = 0; i < points.size(); i += 2) {
+				const Vec2D control = calculate_contol_point(last_control_point, current_pos);
+
+				const Vec2D end = curve.coords_type == Coords_Type::absolute ?
+					Vec2D{ points[i], points[i + 1] } :
+					current_point_of_reference + Vec2D{ points[i], points[i + 1] };
+
+				draw::quadr_bezier(current_pos, control, end);
+				current_pos = end;
+				last_control_point = control;
+			}
+			current_point_of_reference = current_pos;	//polybezier is finished -> current position becomes new point of reference for relative coords
+		}
 
 		curve = take_next_bezier(data.content);
 	}
-	return current;
+	return current_point_of_reference;
 }
 
-Vec2D path::process_cubic_bezier(Path_Elem_data data, Vec2D current)
+//current_point_of_reference is point relative coordiantes are specified relative to.
+//in the begin, this is also the current position of the plotter.
+Vec2D path::process_cubic_bezier(Path_Elem_data data, Vec2D current_point_of_reference)
 {
-	//At the end of the command, the new current point becomes the final (x,y) coordinate pair used in the polybézier.
-	return current; //<-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- 
+	Bezier_Data curve = take_next_bezier(data.content);
+	Vec2D last_control_point = Vec2D::no_value;
+	while (curve.content != "") {
+		const std::vector<double> points = from_csv(curve.content);
+
+		if (curve.control_data == Control_Given::expl) {
+			assert(points.size() % 6 == 0);
+
+			Vec2D current_pos = current_point_of_reference;		//relevant to draw next bezier, starting at current_pos
+			for (std::size_t i = 0; i < points.size(); i += 6) {
+				const Vec2D control_1 = curve.coords_type == Coords_Type::absolute ?
+					Vec2D{ points[i], points[i + 1] } :
+					current_point_of_reference + Vec2D{ points[i], points[i + 1] };
+
+				const Vec2D control_2 = curve.coords_type == Coords_Type::absolute ?
+					Vec2D{ points[i + 2], points[i + 3] } :
+					current_point_of_reference + Vec2D{ points[i + 2], points[i + 3] };
+
+				const Vec2D end = curve.coords_type == Coords_Type::absolute ?
+					Vec2D{ points[i + 4], points[i + 5] } :
+					current_point_of_reference + Vec2D{ points[i + 4], points[i + 5] };
+
+				draw::cubic_bezier(current_pos, control_1, control_2, end);
+				current_pos = end;
+				last_control_point = control_2;	//not used in this loop, but the loop for implicit control points
+			}
+			current_point_of_reference = current_pos;	//polybezier is finished -> current position becomes new point of reference for relative coords
+		}
+		if (curve.control_data == Control_Given::impl) {
+			assert(points.size() % 4 == 0);
+			if (last_control_point == Vec2D::no_value) {
+				last_control_point = current_point_of_reference;	//current_point_of_reference is also current position
+			}
+
+			Vec2D current_pos = current_point_of_reference;		//relevant to draw next bezier, starting at current_pos
+			for (std::size_t i = 0; i < points.size(); i += 4) {
+				const Vec2D control_1 = calculate_contol_point(last_control_point, current_pos);
+
+				const Vec2D control_2 = curve.coords_type == Coords_Type::absolute ?
+					Vec2D{ points[i], points[i + 1] } :
+					current_point_of_reference + Vec2D{ points[i], points[i + 1] };
+
+				const Vec2D end = curve.coords_type == Coords_Type::absolute ?
+					Vec2D{ points[i + 2], points[i + 3] } :
+					current_point_of_reference + Vec2D{ points[i + 2], points[i + 3] };
+
+				draw::cubic_bezier(current_pos, control_1, control_2, end);
+				current_pos = end;
+				last_control_point = control_2;
+			}
+			current_point_of_reference = current_pos;	//polybezier is finished -> current position becomes new point of reference for relative coords
+		}
+	}
+
+	return current_point_of_reference;
 }
 
 Vec2D path::calculate_contol_point(Vec2D last_control_point, Vec2D mirror)

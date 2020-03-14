@@ -7,11 +7,13 @@ struct Vec2D
 {
 	double x;
 	double y;
+
+	//constant to indicate a Vec2D has not yet been set
+	static const Vec2D no_value;
 };
 
 
-//constant to indicate a Vec2D has not yet been set
-constexpr Vec2D no_value = { std::numeric_limits<double>::max(), std::numeric_limits<double>::max() };
+
 
 Vec2D operator+(Vec2D a, Vec2D b);
 Vec2D operator-(Vec2D a, Vec2D b);

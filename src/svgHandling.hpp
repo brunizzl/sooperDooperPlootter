@@ -200,9 +200,10 @@ namespace path {
 	Path_Elem_data take_next_elem(std::string_view& view);
 
 	//do the drawing of as much bezier curves as data can deliver
+	//current_point_of_reference is current position of plotter
 	//return where they finnished drawing.
-	Vec2D process_quadr_bezier(Path_Elem_data data, Vec2D current);
-	Vec2D process_cubic_bezier(Path_Elem_data data, Vec2D current);
+	Vec2D process_quadr_bezier(Path_Elem_data data, Vec2D current_point_of_reference);
+	Vec2D process_cubic_bezier(Path_Elem_data data, Vec2D current_point_of_reference);
 
 	//control point is given explicitly -> set to expl
 	//control point is to be calculated from the last control point -> set to impl
@@ -241,13 +242,13 @@ namespace path {
 namespace draw {
 	constexpr std::size_t default_res = 1;
 
-	void line				(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
-	void rect				(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
-	void circle				(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
-	void ellypse			(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
-	void polyline			(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
-	void polygon			(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
-	void path				(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void line		(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void rect		(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void circle		(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void ellypse	(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void polyline	(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void polygon	(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void path		(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
 
 	//the following functions are called mostly from path()
 	//IMPORTANT: all lengths and vectors are assumed to already be transformed.
