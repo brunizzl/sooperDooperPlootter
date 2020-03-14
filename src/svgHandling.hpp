@@ -20,20 +20,6 @@ void draw_from_file(const char* const name, double board_width, double board_hei
 //also swaps out newlines within quotes to spaces ("...d=\"M100 100 \n L20 30...\"..." becomes "...d=\"M100 100   L20 30...\"...")
 void preprocess_str(std::string& str);
 
-//the svg standard allows for view boxes to be defined inside other view boxes.
-//this forces an implementation of the complete standard to not save the view box as rectangle, but as polygon.
-//also there may be multible instances of view boxes.
-//i ignore all view boxes but the first one and live a happy live.
-namespace view_box {
-	extern Vec2D min;	//upper left corner of box
-	extern Vec2D max;	//lower right corner of box
-
-	void set(std::string_view data);
-
-	bool contains(Board_Vec point);
-}
-
-
 
 
 struct Transform_Matrix
@@ -75,6 +61,32 @@ std::string_view name_of(Transform transform);
 
 static const Transform all_transforms[] = { Transform::matrix, Transform::translate, Transform::scale,
 	Transform::rotate, Transform::skew_x, Transform::skew_y, };
+
+//the svg standard allows for view boxes to be defined inside other view boxes.
+//this forces an implementation of the complete standard to check every coordinate transformation, if we are still within the view box.
+//this removes the possibility of expressing a combination of transformations as matrix multiplication. 
+//i therefore only track the outhermost view box.
+class View_Box
+{
+	static Board_Vec min;	//upper left corner of box
+	static Board_Vec max;	//lower right corner of box
+
+public:
+
+	//sets view box to have aspect ratio as described in data, but stored in Board units (mm)
+	//the transformation matrix from the outhermost svg coordinate system to the board is returned
+	static Transform_Matrix set(std::string_view data, double board_width, double board_height);
+
+	//checks if point is contained within view box
+	static bool contains(Board_Vec point);
+};
+
+
+
+
+
+
+
 
 //all functions used while parsing/reading
 namespace read {
@@ -234,6 +246,7 @@ namespace path {
 	Bezier_Data take_next_bezier(std::string_view& view);
 
 	//analogous to process_bezier() functions
+	//see here how to calculate: https://www.w3.org/TR/SVG11/paths.html#PathDataEllipticalArcCommands
 	Vec2D process_arc(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point_of_reference);
 }
 

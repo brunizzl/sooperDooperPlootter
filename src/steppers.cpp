@@ -74,7 +74,7 @@ static bool prev_in_view_box = true;
 
 void save_draw_to(Board_Vec point)
 {
-	const bool next_in_view_box = view_box::contains(point);
+	const bool next_in_view_box = View_Box::contains(point);
 	if (prev_in_view_box && next_in_view_box) {
 		//hier bitte basheys sachen aufrufen <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <--
 		std::cout << "------" << point << '\n';
@@ -88,7 +88,7 @@ void save_draw_to(Board_Vec point)
 
 void save_go_to(Board_Vec point)
 {
-	const bool next_in_view_box = view_box::contains(point);
+	const bool next_in_view_box = View_Box::contains(point);
 	if (next_in_view_box) {
 		//hier bitte basheys sachen aufrufen <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <--
 		std::cout << "  ->  " << point << '\n';

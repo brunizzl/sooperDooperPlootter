@@ -129,16 +129,10 @@ void draw_from_file(const char* const name, double board_width, double board_hei
 	preprocess_str(str);
 	std::cout << str << std::endl;
 
-	std::string_view str_view = { str.c_str(), str.length() };
+	const std::string_view str_view = { str.c_str(), str.length() };
 
-	//this thing here is done incredibly crappy. it will just grab the first viewBox is sees and will never try to change its viewbox ever after.
-	std::string_view view_box_data = read::get_attribute_data(str_view, "viewBox=\"");
-	if (view_box_data.length()) {
-		view_box::set(view_box_data);
-	}
-	//creating transformation to display viewbox in board coordinate system (mm)
-	//hier muss noch die richtige transformation zum board hin <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <--
-	Transform_Matrix to_board = scale(1, 1) * translate({ 0.0, 0.0 });
+	const std::string_view view_box_data = read::get_attribute_data(str_view, "viewBox=\"");
+	Transform_Matrix to_board = View_Box::set(view_box_data, board_width, board_height);	
 
 	read::evaluate_fragment(str_view, to_board);
 }
@@ -170,33 +164,13 @@ void preprocess_str(std::string& str)
 	assert(!inside_quotes);	//there should be an even number of '\"' in the string.
 }
 
-//default values expected to be changed in function draw_from_file()
-Vec2D view_box::min = { 0, 0 };
-Vec2D view_box::max = { 100, 100 };
 
-
-void view_box::set(std::string_view data)
-{
-	const std::vector<double> values = read::from_csv(data);
-	assert(values.size() == 4);
-
-	view_box::min.x = values[0];
-	view_box::min.y = values[1];
-	view_box::max.x = values[0] + values[2];	//min.x + width
-	view_box::max.y = values[1] + values[3];	//min.y + height
-}
-
-bool view_box::contains(Board_Vec point)
-{
-	return point.x >= view_box::min.x && point.x <= view_box::max.x &&
-	       point.y >= view_box::min.y && point.y <= view_box::max.y;
-}
 
 
 //allows to initialize a matrix by writing it out as in math
 //because   a c e
 //          b d f
-//          0 0 1  is not the order of the alphabet :(
+//          0 0 1  is not the order of the alphabet
 constexpr Transform_Matrix in_matrix_order(double a, double  c, double  e, double  b, double  d, double  f)
 {
 	return Transform_Matrix{ a, b, c, d, e, f };
@@ -264,6 +238,64 @@ std::string_view name_of(Transform transform)
 	assert(false);	//if this assert is hit, you may update the switchcase above.
 	return {};
 }
+
+
+
+
+//default values (get replaced by set() anyway)
+Board_Vec View_Box::min = { 0, 0 };
+Board_Vec View_Box::max = { 100, 100 };
+
+
+Transform_Matrix View_Box::set(std::string_view data, double board_width, double board_height)
+{
+	const std::vector<double> values = read::from_csv(data);
+	assert(values.size() == 4);
+
+	const double min_x = values[0];
+	const double min_y = values[1];
+	const double width = values[2];
+	const double height = values[3];
+
+	if (width / height < board_width / board_height) {	//view box has taller aspect ratio than board -> leaving space on right and left side of board
+		const double scaling_factor = board_height / height;	//y-direction limits size
+		const double view_width_in_board_units = width * scaling_factor;	//width of view box given in board coordinates
+		const double x_offset = (board_width - view_width_in_board_units) / 2;	//x-coordinate of left boundary of view box given in board coordinates
+
+		View_Box::min.x = x_offset;
+		View_Box::max.x = x_offset + view_width_in_board_units;
+		View_Box::min.y = 0;
+		View_Box::max.y = board_height;
+
+		//     shift to middle of board     scaling to board units                  translate in svg units to (0, 0)
+		return translate({ x_offset, 0 }) * scale(scaling_factor, scaling_factor) * translate({ -min_x, -min_y });
+	}
+	else {	//view box is wider than board -> full use of board_width, but only use lower part of board
+		const double scaling_factor = board_width / width;
+		const double view_height_in_board_units = height * scaling_factor;
+		const double y_offset = board_height - view_height_in_board_units;
+
+		View_Box::min.x = 0;
+		View_Box::max.x = board_width;
+		View_Box::min.y = y_offset;
+		View_Box::max.y = y_offset + view_height_in_board_units;
+
+		//     shift to middle of board     scaling to board units                  translate in svg units to (0, 0)
+		return translate({ 0, y_offset }) * scale(scaling_factor, scaling_factor) * translate({ -min_x, -min_y });
+	}
+}
+
+bool View_Box::contains(Board_Vec point)
+{
+	return point.x >= View_Box::min.x && point.x <= View_Box::max.x &&
+		point.y >= View_Box::min.y && point.y <= View_Box::max.y;
+}
+
+
+
+
+
+
 
 using namespace read;
 
