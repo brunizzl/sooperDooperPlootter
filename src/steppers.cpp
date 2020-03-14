@@ -37,24 +37,40 @@ std::ostream& operator<<(std::ostream& stream, Vec2D& coord)
 
 
 
+Vec2D operator*(Matrix2X2 A, Vec2D v)
+{
+	return Vec2D{ A.a * v.x + A.b * v.y,
+				  A.c * v.x + A.d * v.y };
+}
+
+
+
+
+
+
+Board_Vec::Board_Vec(double x_, double y_)
+	:x(x_), y(y_)
+{
+}
+
 Board_Vec operator+(Board_Vec a, Board_Vec b)
 {
-	return { a.x + b.x, a.y + b.y };
+	return Board_Vec(a.x + b.x, a.y + b.y);
 }
 
 Board_Vec operator-(Board_Vec a, Board_Vec b)
 {
-	return { a.x - b.x, a.y - b.y };
+	return Board_Vec(a.x - b.x, a.y - b.y);
 }
 
 Board_Vec operator-(Board_Vec a)
 {
-	return { -a.x, -a.y };
+	return Board_Vec(-a.x, -a.y);
 }
 
 Board_Vec operator*(double factor, Board_Vec vec)
 {
-	return { factor * vec.x, factor * vec.y };
+	return Board_Vec(factor * vec.x, factor * vec.y);
 }
 
 bool operator==(Board_Vec a, Board_Vec b)
@@ -69,7 +85,7 @@ std::ostream& operator<<(std::ostream& stream, Board_Vec& coord)
 }
 
 
-//stores if the last move command could be exected or was ignored, as it lead putside the view box
+//stores if the last move command could be exected or was ignored because it lead outside the view box
 static bool prev_in_view_box = true;
 
 void save_draw_to(Board_Vec point)
@@ -95,6 +111,3 @@ void save_go_to(Board_Vec point)
 	}
 	prev_in_view_box = next_in_view_box;
 }
-
-
-

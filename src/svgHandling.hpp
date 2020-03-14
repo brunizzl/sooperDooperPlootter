@@ -104,7 +104,7 @@ namespace read {
 		polyline,
 		polygon,
 		rect,
-		ellypse,
+		ellipse,
 		circle,
 		path,
 
@@ -115,7 +115,7 @@ namespace read {
 
 	//array of all types BUT UNKNOWN to be used in range based for loops
 	static const Elem_Type all_elem_types[] = { Elem_Type::svg, Elem_Type::line, Elem_Type::polyline, Elem_Type::polygon,
-		Elem_Type::rect, Elem_Type::ellypse, Elem_Type::circle, Elem_Type::path, Elem_Type::g, };
+		Elem_Type::rect, Elem_Type::ellipse, Elem_Type::circle, Elem_Type::path, Elem_Type::g, };
 
 	std::string_view name_of(Elem_Type type);
 
@@ -258,13 +258,13 @@ namespace path {
 namespace draw {
 	constexpr std::size_t default_res = 1;
 
-	void line		(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
-	void rect		(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
-	void circle		(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
-	void ellypse	(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
-	void polyline	(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
-	void polygon	(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
-	void path		(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void line     (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void rect     (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void circle   (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void ellipse  (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void polyline (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void polygon  (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void path     (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
 
 	//the following functions are called mostly from path()
 
@@ -274,11 +274,12 @@ namespace draw {
 		negative,	//mathematical negative == clockwise
 	};
 
-	//arc is part of ellypse between start_angle and end_angle
+	//arc is part of ellipse between start_angle and end_angle
 	//if mathematical_positive is true, the arc from start to end turning counterclockwise is drawn, clockwise if false
 	//angles are expected to be in rad
-	void arc(Board_Vec center, double rx, double ry, double start_angle, double end_angle,
-		Rotation rotation, std::size_t resolution = default_res);
+	//note: a rotated ellipse can not be described as an unrotated one, hence we need to drag the rotation matrix into this function.
+	void arc(const Transform_Matrix& transform_matrix, Vec2D center, double rx, double ry, double start_angle,
+		double end_angle, Rotation rotation, std::size_t resolution = default_res);
 
 	void path_line(Board_Vec start, Board_Vec end, std::size_t resolution = default_res);
 	void quadr_bezier(Board_Vec start, Board_Vec control, Board_Vec end, std::size_t resolution = default_res);

@@ -20,6 +20,17 @@ bool operator==(Vec2D a, Vec2D b);
 
 std::ostream& operator<<(std::ostream& stream, const Vec2D& coord);
 
+//used to simplify some Vector equations
+struct Matrix2X2
+{
+	double a, b, c, d;
+	//corresponds to Matrix 
+	// a b
+	// c d
+};
+
+Vec2D operator*(Matrix2X2 A, Vec2D v);
+
 
 //exactly analogous to Vec2D, but different type to make sure, 
 //only transformed vectors are drawn
@@ -27,6 +38,8 @@ struct Board_Vec
 {
 	double x;
 	double y;
+
+	explicit Board_Vec(double x_, double y_);	//do not allow brace enclosed initialisation for Board_Vec
 };
 
 Board_Vec operator+(Board_Vec a, Board_Vec b);
