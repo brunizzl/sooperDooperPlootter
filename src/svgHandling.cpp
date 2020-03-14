@@ -137,7 +137,7 @@ void draw_from_file(const char* const name, double board_width, double board_hei
 		view_box::set(view_box_data);
 	}
 	//creating transformation to display viewbox in board coordinate system (mm)
-	//hier muss noch die richtige transformation von zum board hin <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <--
+	//hier muss noch die richtige transformation zum board hin <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <--
 	Transform_Matrix to_board = scale(1, 1) * translate({ 0.0, 0.0 });
 
 	read::evaluate_fragment(str_view, to_board);
@@ -186,7 +186,7 @@ void view_box::set(std::string_view data)
 	view_box::max.y = values[1] + values[3];	//min.y + height
 }
 
-bool view_box::contains(Vec2D point)
+bool view_box::contains(Board_Vec point)
 {
 	return point.x >= view_box::min.x && point.x <= view_box::max.x &&
 	       point.y >= view_box::min.y && point.y <= view_box::max.y;
@@ -211,13 +211,13 @@ Transform_Matrix operator*(const Transform_Matrix& fst, const Transform_Matrix& 
 	                       B * a + D * b,    B * c + D * d,    F + D * f + B * e);
 }
 
-Vec2D operator*(const Transform_Matrix& matrix, Vec2D vec)
+Board_Vec operator*(const Transform_Matrix& matrix, Vec2D vec)
 {
 	const double& a = matrix.a, b = matrix.b, c = matrix.c, d = matrix.d, e = matrix.e, f = matrix.f,
 		          x = vec.x, y = vec.y;
 
-	return Vec2D{ a * x + c * y + e,
-	              b * x + d * y + f };
+	return Board_Vec{ a * x + c * y + e,
+	                     b * x + d * y + f };
 }
 
 Transform_Matrix translate(Vec2D t)
@@ -600,7 +600,7 @@ Path_Elem_data path::take_next_elem(std::string_view& view)
 
 //current_point_of_reference is point relative coordiantes are specified relative to.
 //in the begin, this is also the current position of the plotter.
-Vec2D path::process_quadr_bezier(Path_Elem_data data, Vec2D current_point_of_reference)
+Vec2D path::process_quadr_bezier(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point_of_reference)
 {
 	Bezier_Data curve = take_next_bezier(data.content);
 	Vec2D last_control_point = Vec2D::no_value;
@@ -620,7 +620,7 @@ Vec2D path::process_quadr_bezier(Path_Elem_data data, Vec2D current_point_of_ref
 					Vec2D{ points[i + 2], points[i + 3] } :
 					current_point_of_reference + Vec2D{ points[i + 2], points[i + 3] };
 
-				draw::quadr_bezier(current_pos, control, end);
+				draw::quadr_bezier(transform_matrix * current_pos, transform_matrix * control, transform_matrix * end);
 				current_pos = end;
 				last_control_point = control;	//not used in this loop, but the loop for implicit control points
 			}
@@ -640,7 +640,7 @@ Vec2D path::process_quadr_bezier(Path_Elem_data data, Vec2D current_point_of_ref
 					Vec2D{ points[i], points[i + 1] } :
 					current_point_of_reference + Vec2D{ points[i], points[i + 1] };
 
-				draw::quadr_bezier(current_pos, control, end);
+				draw::quadr_bezier(transform_matrix * current_pos, transform_matrix * control, transform_matrix * end);
 				current_pos = end;
 				last_control_point = control;
 			}
@@ -654,7 +654,7 @@ Vec2D path::process_quadr_bezier(Path_Elem_data data, Vec2D current_point_of_ref
 
 //current_point_of_reference is point relative coordiantes are specified relative to.
 //in the begin, this is also the current position of the plotter.
-Vec2D path::process_cubic_bezier(Path_Elem_data data, Vec2D current_point_of_reference)
+Vec2D path::process_cubic_bezier(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point_of_reference)
 {
 	Bezier_Data curve = take_next_bezier(data.content);
 	Vec2D last_control_point = Vec2D::no_value;
@@ -678,7 +678,7 @@ Vec2D path::process_cubic_bezier(Path_Elem_data data, Vec2D current_point_of_ref
 					Vec2D{ points[i + 4], points[i + 5] } :
 					current_point_of_reference + Vec2D{ points[i + 4], points[i + 5] };
 
-				draw::cubic_bezier(current_pos, control_1, control_2, end);
+				draw::cubic_bezier(transform_matrix * current_pos, transform_matrix * control_1, transform_matrix * control_2, transform_matrix * end);
 				current_pos = end;
 				last_control_point = control_2;	//not used in this loop, but the loop for implicit control points
 			}
@@ -702,7 +702,7 @@ Vec2D path::process_cubic_bezier(Path_Elem_data data, Vec2D current_point_of_ref
 					Vec2D{ points[i + 2], points[i + 3] } :
 					current_point_of_reference + Vec2D{ points[i + 2], points[i + 3] };
 
-				draw::cubic_bezier(current_pos, control_1, control_2, end);
+				draw::cubic_bezier(transform_matrix * current_pos, transform_matrix * control_1, transform_matrix * control_2, transform_matrix * end);
 				current_pos = end;
 				last_control_point = control_2;
 			}
@@ -744,6 +744,12 @@ Bezier_Data path::take_next_bezier(std::string_view& view)
 	return { "", Control_Given::expl, Coords_Type::absolute };
 }
 
+Vec2D path::process_arc(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point_of_reference)
+{
+	//<-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <--<-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <--
+	return current_point_of_reference;
+}
+
 
 
 
@@ -761,8 +767,8 @@ void draw::line(Transform_Matrix transform_matrix, std::string_view parameters, 
 	const double x2 = read::to_scaled(read::get_attribute_data(parameters, { "x2=\"" }), 0.0);
 	const double y2 = read::to_scaled(read::get_attribute_data(parameters, { "y2=\"" }), 0.0);
 
-	const Vec2D start = transform_matrix * Vec2D{ x1, y1 };
-	const Vec2D end = transform_matrix * Vec2D{ x1, y1 };
+	const Board_Vec start = transform_matrix * Vec2D{ x1, y1 };
+	const Board_Vec end = transform_matrix * Vec2D{ x1, y1 };
 	save_go_to(start);
 	path_line(start, end);
 }
@@ -787,10 +793,10 @@ void draw::rect(Transform_Matrix transform_matrix, std::string_view parameters, 
 	if (ry > height / 2) ry = height / 2;
 
 	if (rx == 0) {	//draw normal rectangle
-		const Vec2D upper_right = transform_matrix * Vec2D{ x + width, y };
-		const Vec2D upper_left =  transform_matrix * Vec2D{ x, y };
-		const Vec2D lower_left =  transform_matrix * Vec2D{ x, y + height };
-		const Vec2D lower_right = transform_matrix * Vec2D{ x + width, y + height };
+		const Board_Vec upper_right = transform_matrix * Vec2D{ x + width, y };
+		const Board_Vec upper_left =  transform_matrix * Vec2D{ x, y };
+		const Board_Vec lower_left =  transform_matrix * Vec2D{ x, y + height };
+		const Board_Vec lower_right = transform_matrix * Vec2D{ x + width, y + height };
 
 		//draws in order       |start
 		//                     v
@@ -808,8 +814,8 @@ void draw::rect(Transform_Matrix transform_matrix, std::string_view parameters, 
 	}
 	else {	//draw rectangle with corners rounded of
 		//these two points are the center point of the upper right ellypse (arc) and the lower left ellypse respectively
-		const Vec2D center_upper_right = transform_matrix * Vec2D{ x + width - rx, y + ry };
-		const Vec2D center_lower_left = transform_matrix * Vec2D{ x + rx, y + height - ry };
+		const Board_Vec center_upper_right = transform_matrix * Vec2D{ x + width - rx, y + ry };
+		const Board_Vec center_lower_left = transform_matrix * Vec2D{ x + rx, y + height - ry };
 		const double right_x = center_upper_right.x;
 		const double left_x = center_lower_left.x;
 		const double upper_y = center_upper_right.y;
@@ -884,10 +890,10 @@ void draw::polyline(Transform_Matrix transform_matrix, std::string_view paramete
 	const std::vector<double> points = from_csv(points_view);
 	assert(points.size() % 2 == 0);
 
-	Vec2D start = transform_matrix * Vec2D{ points[0], points[1] };
+	Board_Vec start = transform_matrix * Vec2D{ points[0], points[1] };
 	save_go_to(start);
 	for (std::size_t i = 2; i < points.size(); i += 2) {
-		const Vec2D end = transform_matrix * Vec2D{ points[i], points[i + 1] };
+		const Board_Vec end = transform_matrix * Vec2D{ points[i], points[i + 1] };
 		path_line(start, end);
 		start = end;
 	}
@@ -904,8 +910,8 @@ void draw::polygon(Transform_Matrix transform_matrix, std::string_view parameter
 	const std::vector<double> points = from_csv(points_view);
 	assert(points.size() % 2 == 0);
 
-	Vec2D start = transform_matrix * Vec2D{ points[0], points[1] };
-	Vec2D end; 
+	Board_Vec start = transform_matrix * Vec2D{ points[0], points[1] };
+	Board_Vec end;
 	save_go_to(start);
 	for (std::size_t i = 2; i < points.size(); i += 2) {
 		end = transform_matrix * Vec2D{ points[i], points[i + 1] };
@@ -998,15 +1004,16 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 			new_subpath = false;
 			break;
 
-		case Path_Elem::arc: //<-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- 
+		case Path_Elem::arc: 
+			current_point = process_arc(transform_matrix, next_elem, current_point);
 			new_subpath = false;
 			break;
 		case Path_Elem::quadr_bezier: 
-			current_point = process_quadr_bezier(next_elem, current_point);
+			current_point = process_quadr_bezier(transform_matrix, next_elem, current_point);
 			new_subpath = false;
 			break;
 		case Path_Elem::cubic_bezier:
-			current_point = process_cubic_bezier(next_elem, current_point);
+			current_point = process_cubic_bezier(transform_matrix, next_elem, current_point);
 			new_subpath = false;
 			break;
 		case Path_Elem::closed:
@@ -1019,7 +1026,7 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 	}
 }
 
-void draw::arc(Vec2D center, double rx, double ry, double start_angle, double end_angle, Rotation rotation, std::size_t resolution)
+void draw::arc(Board_Vec center, double rx, double ry, double start_angle, double end_angle, Rotation rotation, std::size_t resolution)
 {
 	const double angle_per_step =rotation == Rotation::positive ? 
 		(end_angle - start_angle) / resolution : 
@@ -1031,7 +1038,7 @@ void draw::arc(Vec2D center, double rx, double ry, double start_angle, double en
 	}
 }
 
-void draw::path_line(Vec2D start, Vec2D end, std::size_t resolution)
+void draw::path_line(Board_Vec start, Board_Vec end, std::size_t resolution)
 {
 	for (std::size_t step = 1; step <= resolution; step++) {
 		//as given in wikipedia for linear bezier curves: https://en.wikipedia.org/wiki/B%C3%A9zier_curve#Linear_B%C3%A9zier_curves
@@ -1040,17 +1047,17 @@ void draw::path_line(Vec2D start, Vec2D end, std::size_t resolution)
 	}
 }
 
-void draw::quadr_bezier(Vec2D start, Vec2D control, Vec2D end, std::size_t resolution)
+void draw::quadr_bezier(Board_Vec start, Board_Vec control, Board_Vec end, std::size_t resolution)
 {
 	for (std::size_t step = 1; step <= resolution; step++) {
 		//formula taken from https://en.wikipedia.org/wiki/B%C3%A9zier_curve#Quadratic_B%C3%A9zier_curves
 		const double t = step / (double)resolution;
-		const Vec2D waypoint = (1 - t) * (1 - t) * start + 2 * (1 - t) * t * control + t * t * end;
+		const Board_Vec waypoint = (1 - t) * (1 - t) * start + 2 * (1 - t) * t * control + t * t * end;
 		save_draw_to(waypoint);
 	}
 }
 
-void draw::cubic_bezier(Vec2D start, Vec2D control_1, Vec2D control_2, Vec2D end, std::size_t resolution)
+void draw::cubic_bezier(Board_Vec start, Board_Vec control_1, Board_Vec control_2, Board_Vec end, std::size_t resolution)
 {
 	for (std::size_t step = 1; step <= resolution; step++) {
 		//formula taken from https://en.wikipedia.org/wiki/B%C3%A9zier_curve#Cubic_B%C3%A9zier_curves
@@ -1058,7 +1065,7 @@ void draw::cubic_bezier(Vec2D start, Vec2D control_1, Vec2D control_2, Vec2D end
 		const double tpow2 = t * t;
 		const double onet = (1 - t);
 		const double onetpow2 = onet * onet;
-		const Vec2D waypoint = onetpow2 * (onet * start + 3 * t * control_1) + tpow2 * (3 * onet * control_2 + t * end);
+		const Board_Vec waypoint = onetpow2 * (onet * start + 3 * t * control_1) + tpow2 * (3 * onet * control_2 + t * end);
 		//const Vec2D waypoint = (1 - t) * (1 - t) * (1 - t) * start + 3 * (1 - t) * (1 - t) * t * control_1 + 3 * (1 - t) * t * t * control_2 + t * t * t * end;
 		save_draw_to(waypoint);
 	}

@@ -36,10 +36,43 @@ std::ostream& operator<<(std::ostream& stream, Vec2D& coord)
 }
 
 
+
+Board_Vec operator+(Board_Vec a, Board_Vec b)
+{
+	return { a.x + b.x, a.y + b.y };
+}
+
+Board_Vec operator-(Board_Vec a, Board_Vec b)
+{
+	return { a.x - b.x, a.y - b.y };
+}
+
+Board_Vec operator-(Board_Vec a)
+{
+	return { -a.x, -a.y };
+}
+
+Board_Vec operator*(double factor, Board_Vec vec)
+{
+	return { factor * vec.x, factor * vec.y };
+}
+
+bool operator==(Board_Vec a, Board_Vec b)
+{
+	return (a.x == b.x && a.y == b.y);
+}
+
+std::ostream& operator<<(std::ostream& stream, Board_Vec& coord)
+{
+	stream << "(" << coord.x << ", " << coord.y << ")";
+	return stream;
+}
+
+
 //stores if the last move command could be exected or was ignored, as it lead putside the view box
 static bool prev_in_view_box = true;
 
-void save_draw_to(Vec2D point)
+void save_draw_to(Board_Vec point)
 {
 	const bool next_in_view_box = view_box::contains(point);
 	if (prev_in_view_box && next_in_view_box) {
@@ -53,7 +86,7 @@ void save_draw_to(Vec2D point)
 	prev_in_view_box = next_in_view_box;
 }
 
-void save_go_to(Vec2D point)
+void save_go_to(Board_Vec point)
 {
 	const bool next_in_view_box = view_box::contains(point);
 	if (next_in_view_box) {

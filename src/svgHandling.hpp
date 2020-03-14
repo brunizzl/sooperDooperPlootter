@@ -30,7 +30,7 @@ namespace view_box {
 
 	void set(std::string_view data);
 
-	bool contains(Vec2D point);
+	bool contains(Board_Vec point);
 }
 
 
@@ -50,7 +50,7 @@ struct Transform_Matrix
 Transform_Matrix operator*(const Transform_Matrix& fst, const Transform_Matrix& snd);
 
 //matrix * vector, as in math. the third coordinate of vec is always 1.
-Vec2D operator*(const Transform_Matrix& matrix, Vec2D vec);
+Board_Vec operator*(const Transform_Matrix& matrix, Vec2D vec);
 
 //create matrices from different transformations
 //these are also all taken from here: https://www.w3.org/TR/SVG11/coords.html#TransformMatrixDefined
@@ -202,8 +202,8 @@ namespace path {
 	//do the drawing of as much bezier curves as data can deliver
 	//current_point_of_reference is current position of plotter
 	//return where they finnished drawing.
-	Vec2D process_quadr_bezier(Path_Elem_data data, Vec2D current_point_of_reference);
-	Vec2D process_cubic_bezier(Path_Elem_data data, Vec2D current_point_of_reference);
+	Vec2D process_quadr_bezier(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point_of_reference);
+	Vec2D process_cubic_bezier(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point_of_reference);
 
 	//control point is given explicitly -> set to expl
 	//control point is to be calculated from the last control point -> set to impl
@@ -232,6 +232,9 @@ namespace path {
 	//if no data is found, content is set to "". 
 	//both quadratic and cubic share this same function
 	Bezier_Data take_next_bezier(std::string_view& view);
+
+	//analogous to process_bezier() functions
+	Vec2D process_arc(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point_of_reference);
 }
 
 
@@ -251,7 +254,6 @@ namespace draw {
 	void path		(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
 
 	//the following functions are called mostly from path()
-	//IMPORTANT: all lengths and vectors are assumed to already be transformed.
 
 	enum class Rotation
 	{
@@ -262,10 +264,10 @@ namespace draw {
 	//arc is part of ellypse between start_angle and end_angle
 	//if mathematical_positive is true, the arc from start to end turning counterclockwise is drawn, clockwise if false
 	//angles are expected to be in rad
-	void arc(Vec2D center, double rx, double ry, double start_angle, double end_angle, 
+	void arc(Board_Vec center, double rx, double ry, double start_angle, double end_angle,
 		Rotation rotation, std::size_t resolution = default_res);
 
-	void path_line(Vec2D start, Vec2D end, std::size_t resolution = default_res);
-	void quadr_bezier(Vec2D start, Vec2D control, Vec2D end, std::size_t resolution = default_res);
-	void cubic_bezier(Vec2D start, Vec2D control_1, Vec2D control_2, Vec2D end, std::size_t resolution = default_res);
+	void path_line(Board_Vec start, Board_Vec end, std::size_t resolution = default_res);
+	void quadr_bezier(Board_Vec start, Board_Vec control, Board_Vec end, std::size_t resolution = default_res);
+	void cubic_bezier(Board_Vec start, Board_Vec control_1, Board_Vec control_2, Board_Vec end, std::size_t resolution = default_res);
 }
