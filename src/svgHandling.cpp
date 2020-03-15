@@ -52,16 +52,6 @@ double to_rad(double degree)
 	return degree * pi / 180.0;
 }
 
-//removes leading ' ' and ',' characters if possible
-std::string_view remove_leading_seperators(std::string_view view, std::size_t start = 0)
-{
-	const std::size_t fist_after_seperator = view.find_first_not_of(", ", start);
-	if (fist_after_seperator != std::string::npos) {
-		view.remove_prefix(fist_after_seperator);
-	}
-	return view;
-}
-
 //made to find matching "</svg>" and "</g>" to the opening ones
 //function assumes, that search_zone already misses the opening sequence for searched closing_sequence.
 //-> if "</g>" is searched, there is one "</g>" more in search_zone, than there are "<g ..." in search_zone
@@ -149,7 +139,7 @@ void draw_from_file(const char* const name, double board_width, double board_hei
 		filestream.read(&str[0], str.size());
 	}
 	preprocess_str(str);
-	std::cout << str << std::endl;
+	//std::cout << str << std::endl;
 
 	const std::string_view str_view = { str.c_str(), str.length() };
 
@@ -171,16 +161,21 @@ void preprocess_str(std::string& str)
 	//this part is mainly, because the path attribute may include newlines. 
 	//to keep some readability for debugging, only the newlines inside quotes are replaced.
 	bool inside_quotes = false;
-	for (char& ch : str) {
-		switch (ch) {
+	for (auto& pos = str.begin(); pos != str.end(); ++pos) {
+		switch (*pos) {
 		case '\"':
 			inside_quotes = !inside_quotes;
 			break;
 		case '\n':
 			if (inside_quotes) {
-				ch = ' ';
+				*pos = ' ';
 			}
 			break;
+		case '-':
+			if (inside_quotes) {
+				pos = str.insert(pos, ' ');
+				++pos;	//not at '-' again, end of loop iterates over '-'
+			}
 		}
 	}
 	assert(!inside_quotes);	//there should be an even number of '\"' in the string.
@@ -404,18 +399,14 @@ std::vector<double> read::from_csv(std::string_view csv)
 	std::vector<double> result;
 	result.reserve(std::count_if(csv.begin(), csv.end(), [](char c) { return c == ' ' || c == ','; }) + 1);
 
-	std::size_t next_seperator = csv.find_first_of(", ");
-	while (next_seperator != std::string::npos) {
-		result.push_back(to_scaled(shorten_to(csv, next_seperator)));
-		csv = remove_leading_seperators(csv, next_seperator);
-		next_seperator = csv.find_first_of(", ");
+	std::size_t next_value_start = csv.find_first_of("0123456789.+-");
+	while (next_value_start != std::string::npos) {
+		const std::size_t next_seperator = csv.find_first_of(", ", next_value_start);
+		const std::string_view next_value = in_between(csv, next_value_start - 1, next_seperator);
+		result.push_back(to_scaled(next_value));
+		next_value_start = csv.find_first_of("0123456789.+-", next_seperator);
 	}
 
-	if (csv != "") {
-		result.push_back(to_scaled(csv));
-	}
-
-	result.shrink_to_fit();
 	return result;
 }
 
@@ -588,7 +579,13 @@ Transform_Matrix read::get_transform_matrix(std::string_view group_attributes)
 				}
 
 				transform_list.remove_prefix(closing_parenthesis + 1);	//all up to closing parenthesis is removed
-				transform_list = remove_leading_seperators(transform_list);
+				const std::size_t next_not_seperator = transform_list.find_first_not_of(", ");
+				if (next_not_seperator != std::string::npos) {
+					transform_list.remove_prefix(next_not_seperator);
+				}
+				else {
+					transform_list = "";
+				}
 				break;	//transformation is applied and next transformation may be read in -> breaking for() loop
 			}
 		}
@@ -626,7 +623,7 @@ Path_Elem_data path::take_next_elem(std::string_view& view)
 	case 'q':
 	case 'T':
 	case 't':
-		snd_letter_pos = view.find_first_of("MmVvHhLlAaCcSsZz", snd_letter_pos + 1);	//QqTt is missing
+		snd_letter_pos = view.find_first_of("MmVvHhLlAaCcSsZz", snd_letter_pos);	//QqTt is missing
 		content = in_between(view, fst_letter_pos - 1, snd_letter_pos);	//-1 as bezier needs to know what kind
 		result = { content, Path_Elem::quadr_bezier, Coords_Type::absolute };		
 		break;
@@ -634,7 +631,7 @@ Path_Elem_data path::take_next_elem(std::string_view& view)
 	case 'c':
 	case 'S':
 	case 's':
-		snd_letter_pos = view.find_first_of("MmVvHhLlAaQqTtZz", snd_letter_pos + 1); //CcSs is missing
+		snd_letter_pos = view.find_first_of("MmVvHhLlAaQqTtZz", snd_letter_pos); //CcSs is missing
 		content = in_between(view, fst_letter_pos - 1, snd_letter_pos);	//-1 as bezier needs to know what kind
 		result = { content, Path_Elem::cubic_bezier, Coords_Type::absolute };		
 		break;
@@ -647,7 +644,7 @@ Path_Elem_data path::take_next_elem(std::string_view& view)
 	}
 
 	if (snd_letter_pos == std::string::npos) view = "";
-	else view.remove_prefix(snd_letter_pos + 1);
+	else view.remove_prefix(snd_letter_pos);
 
 	return result;
 }
@@ -762,6 +759,7 @@ Vec2D path::process_cubic_bezier(const Transform_Matrix& transform_matrix, Path_
 			}
 			current_point_of_reference = current_pos;	//polybezier is finished -> current position becomes new point of reference for relative coords
 		}
+		curve = take_next_bezier(data.content);
 	}
 
 	return current_point_of_reference;
@@ -832,9 +830,9 @@ Vec2D path::process_arc(const Transform_Matrix& transform_matrix, Path_Elem_data
 	const double x1_prime2 = x1_prime * x1_prime;
 	const double y1_prime2 = y1_prime * y1_prime;
 	const double sign = large_arc_flag != sweep_flag ? 1.0 : -1.0;
-	const Vec2D center_prime = sign * std::sqrt((rx2 * ry2 - rx2 * y1_prime2 - ry2 * x1_prime2) /
-		                                           (rx2 * y1_prime2 + ry2 * x1_prime2)) *       Vec2D{	rx* y1_prime / ry, 
-		                                                                                              -ry * x1_prime / rx };
+	const Vec2D center_prime = sign * std::sqrt(std::abs((rx2 * ry2 - rx2 * y1_prime2 - ry2 * x1_prime2) /
+		                                           (rx2 * y1_prime2 + ry2 * x1_prime2))) *       Vec2D{	rx* y1_prime / ry, 
+		                                                                                               -ry * x1_prime / rx };
 	//step 3:
 	const Vec2D center = Matrix2X2{ std::cos(phi), -std::sin(phi),
 									std::sin(phi),  std::cos(phi) } *center_prime + Vec2D{ (x1 + x2) / 2,
@@ -865,10 +863,7 @@ using namespace draw;
 void draw::line(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
 	std::cout << "draw line\n";
-	const std::string_view transform_data = get_attribute_data(parameters, { "transform=" });
-	if (transform_data != "") {
-		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
-	}
+	transform_matrix = transform_matrix * read::get_transform_matrix(parameters);
 
 	const double x1 = read::to_scaled(read::get_attribute_data(parameters, { "x1=" }), 0.0);
 	const double y1 = read::to_scaled(read::get_attribute_data(parameters, { "y1=" }), 0.0);
@@ -876,7 +871,7 @@ void draw::line(Transform_Matrix transform_matrix, std::string_view parameters, 
 	const double y2 = read::to_scaled(read::get_attribute_data(parameters, { "y2=" }), 0.0);
 
 	const Board_Vec start = transform_matrix * Vec2D{ x1, y1 };
-	const Board_Vec end = transform_matrix * Vec2D{ x1, y1 };
+	const Board_Vec end = transform_matrix * Vec2D{ x2, y2 };
 	save_go_to(start);
 	path_line(start, end);
 }
@@ -884,10 +879,7 @@ void draw::line(Transform_Matrix transform_matrix, std::string_view parameters, 
 void draw::rect(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
 	std::cout << "draw rect\n";
-	const std::string_view transform_data = get_attribute_data(parameters, { "transform=" });
-	if (transform_data != "") {
-		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
-	}
+	transform_matrix = transform_matrix * read::get_transform_matrix(parameters);
 
 	const double x = read::to_scaled(read::get_attribute_data(parameters, { "x=" }), 0.0);
 	const double y = read::to_scaled(read::get_attribute_data(parameters, { "y=" }), 0.0);
@@ -930,8 +922,8 @@ void draw::rect(Transform_Matrix transform_matrix, std::string_view parameters, 
 		const double upper_y = center_upper_right.y;
 		const double lower_y = center_lower_left.y;
 
-		//draws in order           | start
-		//                         v
+		//draws in order          | start
+		//                        v
 		//              (2)--(1)--(8)
 		//               | X       |
 		//              (3)       (7)
@@ -939,7 +931,7 @@ void draw::rect(Transform_Matrix transform_matrix, std::string_view parameters, 
 		//              (4)--(5)--(6)		
 		//with X beeing center_upper_right and center_lower_left
 
-		save_go_to(transform_matrix * Vec2D{ right_x, upper_y });			                                             //start
+		save_go_to(transform_matrix * Vec2D{ right_x, upper_y - ry });			                                         //start
 		path_line(transform_matrix * Vec2D{ right_x, upper_y - ry }, transform_matrix * Vec2D{ left_x, upper_y - ry });	 //(1)
 		arc(transform_matrix, { left_x, upper_y }, rx, ry, pi / 2, pi, Rotation::positive);                              //(2)
 		path_line(transform_matrix * Vec2D{ left_x - rx, upper_y }, transform_matrix * Vec2D{ left_x - rx, lower_y });	 //(3)
@@ -954,10 +946,7 @@ void draw::rect(Transform_Matrix transform_matrix, std::string_view parameters, 
 void draw::circle(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
 	std::cout << "draw circle\n";
-	const std::string_view transform_data = get_attribute_data(parameters, { "transform=" });
-	if (transform_data != "") {
-		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
-	}
+	transform_matrix = transform_matrix * read::get_transform_matrix(parameters);
 
 	const double cx = read::to_scaled(read::get_attribute_data(parameters, { "cx=" }), 0.0);
 	const double cy = read::to_scaled(read::get_attribute_data(parameters, { "cy=" }), 0.0);
@@ -965,7 +954,7 @@ void draw::circle(Transform_Matrix transform_matrix, std::string_view parameters
 
 	save_go_to(transform_matrix * (Vec2D{ cx, cy } +Vec2D{ r, 0.0 }));	//intersection of positive x-axis and circle is starting point
 	for (std::size_t step = 1; step <= resolution; step++) {
-		const double angle = 2 * pi * (resolution - step);
+		const double angle = 2 * pi * (resolution - step) / static_cast<double>(resolution);
 		save_draw_to(transform_matrix * Vec2D{ cx + std::cos(angle) * r, cy + std::sin(angle) * r });
 	}
 }
@@ -973,10 +962,7 @@ void draw::circle(Transform_Matrix transform_matrix, std::string_view parameters
 void draw::ellipse(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
 	std::cout << "draw ellypse\n";
-	const std::string_view transform_data = get_attribute_data(parameters, { "transform=" });
-	if (transform_data != "") {
-		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
-	}
+	transform_matrix = transform_matrix * read::get_transform_matrix(parameters);
 
 	const double cx = read::to_scaled(read::get_attribute_data(parameters, { "cx=" }), 0.0);
 	const double cy = read::to_scaled(read::get_attribute_data(parameters, { "cy=" }), 0.0);
@@ -985,7 +971,7 @@ void draw::ellipse(Transform_Matrix transform_matrix, std::string_view parameter
 
 	save_go_to(transform_matrix * (Vec2D{ cx, cy } + Vec2D{ rx, 0.0 }));	//intersection of positive x-axis and ellipse is starting point
 	for (std::size_t step = 1; step <= resolution; step++) {
-		const double angle = 2 * pi * (resolution - step);
+		const double angle = 2 * pi * (resolution - step) / static_cast<double>(resolution);
 		save_draw_to(transform_matrix * Vec2D{ cx + std::cos(angle) * rx, cy + std::sin(angle) * ry });
 	}
 }
@@ -993,10 +979,7 @@ void draw::ellipse(Transform_Matrix transform_matrix, std::string_view parameter
 void draw::polyline(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
 	std::cout << "draw polyline\n";
-	const std::string_view transform_data = get_attribute_data(parameters, { "transform=" });
-	if (transform_data != "") {
-		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
-	}
+	transform_matrix = transform_matrix * read::get_transform_matrix(parameters);
 
 	const std::string_view points_view = get_attribute_data(parameters, { "points=" });
 	const std::vector<double> points = from_csv(points_view);
@@ -1014,10 +997,7 @@ void draw::polyline(Transform_Matrix transform_matrix, std::string_view paramete
 void draw::polygon(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
 	std::cout << "draw polygon\n";
-	const std::string_view transform_data = get_attribute_data(parameters, { "transform=" });
-	if (transform_data != "") {
-		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
-	}
+	transform_matrix = transform_matrix * read::get_transform_matrix(parameters);
 
 	const std::string_view points_view = get_attribute_data(parameters, { "points=" });
 	const std::vector<double> points = from_csv(points_view);
@@ -1038,12 +1018,9 @@ void draw::polygon(Transform_Matrix transform_matrix, std::string_view parameter
 void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
 	std::cout << "draw path\n";
-	const std::string_view transform_data = get_attribute_data(parameters, { "transform=" });
-	if (transform_data != "") {
-		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
-	}
+	transform_matrix = transform_matrix * read::get_transform_matrix(parameters);
 
-	std::string_view data_view = get_attribute_data(parameters, { "data=" });
+	std::string_view data_view = get_attribute_data(parameters, { "d=" });
 	Vec2D current_point = { 0.0, 0.0 };	//as a path always continues from the last point, this is the point the last path element ended (this is not yet transformed)
 	Vec2D current_subpath_begin = { 0.0, 0.0 };
 	bool new_subpath = true;	//information for move to maybe update current_subpath_begin
@@ -1142,13 +1119,16 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 
 void draw::arc(const Transform_Matrix& transform_matrix, Vec2D center, double rx, double ry, double start_angle, double end_angle, Rotation rotation, std::size_t resolution)
 {
-	const double angle_per_step =rotation == Rotation::positive ? 
+	if ((rotation == Rotation::positive) == (start_angle > end_angle)) {
+		end_angle += 2 * pi;
+	}
+	const double angle_per_step = rotation == Rotation::positive ? 
 		(end_angle - start_angle) / resolution : 
 		(2.0 * pi - (end_angle - start_angle)) / resolution;
 
 	for (std::size_t step = 1; step <= resolution; step++) {
 		const double angle = start_angle + angle_per_step * step;
-		save_draw_to(transform_matrix * Vec2D{ center.x + std::cos(angle) * rx, center.y + std::sin(angle) * ry });
+		save_draw_to(transform_matrix * Vec2D{ center.x + std::cos(angle) * rx, center.y - std::sin(angle) * ry });
 	}
 }
 
