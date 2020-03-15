@@ -134,8 +134,8 @@ namespace read {
 	};
 
 	//returns view to the part of content describing your attribute
-	//example: std::string_view("cx=\"100\" cy=\"200\" r=\"20\"").get_attribute_data("cx=\"") 
-	//  yields "100", as this is specified after "cx=\""
+	//example: std::string_view("cx=\"100\" cy=\"200\" r=\"20\"").get_attribute_data("cx=") 
+	//  yields "100", as this is specified after "cx="
 	//if attr_name is not found, "" is returned
 	std::string_view get_attribute_data(std::string_view search_zone, std::string_view attr_name);
 
@@ -256,7 +256,7 @@ namespace path {
 //resolution in draw() determines in how many straight lines the shape is split
 //transform in draw() is matrix needed to transform from current coordinate system to board system
 namespace draw {
-	constexpr std::size_t default_res = 1;
+	constexpr std::size_t default_res = 8;
 
 	void line     (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
 	void rect     (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);

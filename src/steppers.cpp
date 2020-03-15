@@ -88,16 +88,18 @@ std::ostream& operator<<(std::ostream& stream, Board_Vec& coord)
 //stores if the last move command could be exected or was ignored because it lead outside the view box
 static bool prev_in_view_box = true;
 
+//hier bitte basheys funktionen 
+static std::function<void(Board_Vec)> draw_to = [](Board_Vec point) {std::cout << "------" << point << '\n'; };
+static std::function<void(Board_Vec)> go_to   = [](Board_Vec point) {std::cout << "  ->  " << point << '\n'; };
+
 void save_draw_to(Board_Vec point)
 {
 	const bool next_in_view_box = View_Box::contains(point);
 	if (prev_in_view_box && next_in_view_box) {
-		//hier bitte basheys sachen aufrufen <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <--
-		std::cout << "------" << point << '\n';
+		draw_to(point);
 	}
 	else if (next_in_view_box) {
-		//hier bitte basheys sachen aufrufen <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <--
-		std::cout << "  ->  " << point << '\n';
+		go_to(point);
 	}
 	prev_in_view_box = next_in_view_box;
 }
@@ -106,8 +108,13 @@ void save_go_to(Board_Vec point)
 {
 	const bool next_in_view_box = View_Box::contains(point);
 	if (next_in_view_box) {
-		//hier bitte basheys sachen aufrufen <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <--
-		std::cout << "  ->  " << point << '\n';
+		go_to(point);
 	}
 	prev_in_view_box = next_in_view_box;
+}
+
+void set_output_functions(std::function<void (Board_Vec)> new_draw_to, std::function<void (Board_Vec)> new_go_to)
+{
+	draw_to = new_draw_to;
+	go_to   = new_go_to;
 }

@@ -153,7 +153,7 @@ void draw_from_file(const char* const name, double board_width, double board_hei
 
 	const std::string_view str_view = { str.c_str(), str.length() };
 
-	const std::string_view view_box_data = read::get_attribute_data(str_view, "viewBox=\"");
+	const std::string_view view_box_data = read::get_attribute_data(str_view, "viewBox=");
 	Transform_Matrix to_board = View_Box::set(view_box_data, board_width, board_height);	
 
 	read::evaluate_fragment(str_view, to_board);
@@ -363,7 +363,7 @@ std::string_view read::end_marker(Elem_Type type)
 
 std::size_t read::find_skip_quotations(std::string_view search_zone, std::string_view search_obj, std::size_t start)
 {
-	std::size_t next_quotation_start = search_zone.find_first_of('\"', start);
+	std::size_t next_quotation_start = search_zone.find_first_of("\"'", start);
 	std::size_t prev_quotation_end = start;
 
 	while (next_quotation_start != std::string::npos) {
@@ -372,11 +372,11 @@ std::size_t read::find_skip_quotations(std::string_view search_zone, std::string
 		if (found != std::string::npos) {
 			return found + prev_quotation_end;	//search_section has offset of prev_quotation_end from search_zone.
 		}
-		prev_quotation_end = search_zone.find_first_of('\"', next_quotation_start + 1);
+		prev_quotation_end = search_zone.find_first_of("\"'", next_quotation_start + 1);
 		if (prev_quotation_end == std::string::npos) {
-			throw std::exception("function read::find_skip_quotations(): quotation (using \"\") was started, but not ended.");
+			throw std::exception("function read::find_skip_quotations(): quotation (using \"\" or '') was started, but not ended.");
 		}
-		next_quotation_start = search_zone.find_first_of('\"', prev_quotation_end + 1);
+		next_quotation_start = search_zone.find_first_of("\"'", prev_quotation_end + 1);
 	}
 
 	return search_zone.find(search_obj, prev_quotation_end);
@@ -388,9 +388,9 @@ std::string_view read::get_attribute_data(std::string_view search_zone, std::str
 	while (found != std::string::npos) {
 		//this is very trashy and may be changed later. i am aware of that
 		if (found != 0 && (search_zone[found - 1] == ' ' || search_zone[found - 1] == ',') || found == 0) {	//guarantee that attr_name is not just suffix of some other atribute
-			search_zone.remove_prefix(found + attr_name.length());
+			search_zone.remove_prefix(found + attr_name.length() + 1);
 
-			const size_t closing_quote = search_zone.find_first_of('\"');
+			const size_t closing_quote = search_zone.find_first_of("\"'");
 			return shorten_to(search_zone, closing_quote);
 		}
 		search_zone.remove_prefix(found + 1); 
@@ -477,7 +477,7 @@ Elem_Data read::take_next_elem(std::string_view& view)
 
 void read::evaluate_fragment(std::string_view fragment, const Transform_Matrix& transform)
 {
-	std::cout << "\n\nevaluate_fragment():\n" << fragment << std::endl;
+	//std::cout << "\n\nevaluate_fragment():\n" << fragment << std::endl;
 
 	Elem_Data next;
 	do {
@@ -491,8 +491,8 @@ void read::evaluate_fragment(std::string_view fragment, const Transform_Matrix& 
 				const std::size_t nested_svg_end = find_closing_elem(fragment, { "<svg " }, { "</svg>" });
 				const std::string_view nested_svg_fragment = { fragment.data(), nested_svg_end };
 
-				const double x_offset = to_scaled(get_attribute_data(next.content, { "x=\"" }), 0.0);
-				const double y_offset = to_scaled(get_attribute_data(next.content, { "y=\"" }), 0.0);
+				const double x_offset = to_scaled(get_attribute_data(next.content, { "x=" }), 0.0);
+				const double y_offset = to_scaled(get_attribute_data(next.content, { "y=" }), 0.0);
 				const Transform_Matrix nested_matrix = transform * translate({ x_offset, y_offset });
 
 				evaluate_fragment(nested_svg_fragment, nested_matrix);
@@ -533,7 +533,7 @@ Transform_Matrix read::get_transform_matrix(std::string_view group_attributes)
 	Transform_Matrix result_matrix = in_matrix_order(1, 0, 0,
 		                                             0, 1, 0);	//starts as identity matrix
 
-	std::string_view transform_list = get_attribute_data(group_attributes, { "transform=\"" });
+	std::string_view transform_list = get_attribute_data(group_attributes, { "transform=" });
 	while (transform_list.length()) {
 		for (Transform transform : all_transforms) {
 			const std::string_view name = name_of(transform);
@@ -847,10 +847,10 @@ Vec2D path::process_arc(const Transform_Matrix& transform_matrix, Path_Elem_data
 	const double end_angle = std::atan2(center_to_end.y, center_to_end.x) + phi;		//w3 calls this angle theta2 
 
 	//this is now no longer the way given by w3, as i need to find the parameters to plug into my function now
-	const draw::Rotation small_arc_rot = rotation(center_to_start, center_to_end);
-	const draw::Rotation actual_rotation = large_arc_flag ? !small_arc_rot : small_arc_rot;
+	const draw::Rotation small_arc_rotation = rotation(center_to_start, center_to_end);
+	const draw::Rotation actual_rotation = large_arc_flag ? !small_arc_rotation : small_arc_rotation;
 
-	const Transform_Matrix from_arc_coordinates = transform_matrix * rotate(phi);
+	const Transform_Matrix from_arc_coordinates = transform_matrix * rotate(phi, center);
 
 	draw::arc(from_arc_coordinates, center, rx, ry, start_angle, end_angle, actual_rotation);
 
@@ -864,15 +864,16 @@ using namespace draw;
 
 void draw::line(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	const std::string_view transform_data = get_attribute_data(parameters, { "transform=\"" });
+	std::cout << "draw line\n";
+	const std::string_view transform_data = get_attribute_data(parameters, { "transform=" });
 	if (transform_data != "") {
 		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
 	}
 
-	const double x1 = read::to_scaled(read::get_attribute_data(parameters, { "x1=\"" }), 0.0);
-	const double y1 = read::to_scaled(read::get_attribute_data(parameters, { "y1=\"" }), 0.0);
-	const double x2 = read::to_scaled(read::get_attribute_data(parameters, { "x2=\"" }), 0.0);
-	const double y2 = read::to_scaled(read::get_attribute_data(parameters, { "y2=\"" }), 0.0);
+	const double x1 = read::to_scaled(read::get_attribute_data(parameters, { "x1=" }), 0.0);
+	const double y1 = read::to_scaled(read::get_attribute_data(parameters, { "y1=" }), 0.0);
+	const double x2 = read::to_scaled(read::get_attribute_data(parameters, { "x2=" }), 0.0);
+	const double y2 = read::to_scaled(read::get_attribute_data(parameters, { "y2=" }), 0.0);
 
 	const Board_Vec start = transform_matrix * Vec2D{ x1, y1 };
 	const Board_Vec end = transform_matrix * Vec2D{ x1, y1 };
@@ -882,17 +883,18 @@ void draw::line(Transform_Matrix transform_matrix, std::string_view parameters, 
 
 void draw::rect(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	const std::string_view transform_data = get_attribute_data(parameters, { "transform=\"" });
+	std::cout << "draw rect\n";
+	const std::string_view transform_data = get_attribute_data(parameters, { "transform=" });
 	if (transform_data != "") {
 		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
 	}
 
-	const double x = read::to_scaled(read::get_attribute_data(parameters, { "x=\"" }), 0.0);
-	const double y = read::to_scaled(read::get_attribute_data(parameters, { "y=\"" }), 0.0);
-	const double width = read::to_scaled(read::get_attribute_data(parameters, { "width=\"" }), 0.0);
-	const double height = read::to_scaled(read::get_attribute_data(parameters, { "height=\"" }), 0.0);
-	double rx = read::to_scaled(read::get_attribute_data(parameters, { "rx=\"" }), 0.0);
-	double ry = read::to_scaled(read::get_attribute_data(parameters, { "ry=\"" }), 0.0);
+	const double x = read::to_scaled(read::get_attribute_data(parameters, { "x=" }), 0.0);
+	const double y = read::to_scaled(read::get_attribute_data(parameters, { "y=" }), 0.0);
+	const double width = read::to_scaled(read::get_attribute_data(parameters, { "width=" }), 0.0);
+	const double height = read::to_scaled(read::get_attribute_data(parameters, { "height=" }), 0.0);
+	double rx = read::to_scaled(read::get_attribute_data(parameters, { "rx=" }), 0.0);
+	double ry = read::to_scaled(read::get_attribute_data(parameters, { "ry=" }), 0.0);
 
 	if (rx != 0 && ry == 0) ry = rx;
 	if (rx == 0 && ry != 0) rx = ry;
@@ -951,14 +953,15 @@ void draw::rect(Transform_Matrix transform_matrix, std::string_view parameters, 
 
 void draw::circle(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	const std::string_view transform_data = get_attribute_data(parameters, { "transform=\"" });
+	std::cout << "draw circle\n";
+	const std::string_view transform_data = get_attribute_data(parameters, { "transform=" });
 	if (transform_data != "") {
 		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
 	}
 
-	const double cx = read::to_scaled(read::get_attribute_data(parameters, { "cx=\"" }), 0.0);
-	const double cy = read::to_scaled(read::get_attribute_data(parameters, { "cy=\"" }), 0.0);
-	const double r  = read::to_scaled(read::get_attribute_data(parameters, { "r=\"" }), 0.0);
+	const double cx = read::to_scaled(read::get_attribute_data(parameters, { "cx=" }), 0.0);
+	const double cy = read::to_scaled(read::get_attribute_data(parameters, { "cy=" }), 0.0);
+	const double r  = read::to_scaled(read::get_attribute_data(parameters, { "r=" }), 0.0);
 
 	save_go_to(transform_matrix * (Vec2D{ cx, cy } +Vec2D{ r, 0.0 }));	//intersection of positive x-axis and circle is starting point
 	for (std::size_t step = 1; step <= resolution; step++) {
@@ -969,15 +972,16 @@ void draw::circle(Transform_Matrix transform_matrix, std::string_view parameters
 
 void draw::ellipse(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	const std::string_view transform_data = get_attribute_data(parameters, { "transform=\"" });
+	std::cout << "draw ellypse\n";
+	const std::string_view transform_data = get_attribute_data(parameters, { "transform=" });
 	if (transform_data != "") {
 		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
 	}
 
-	const double cx = read::to_scaled(read::get_attribute_data(parameters, { "cx=\"" }), 0.0);
-	const double cy = read::to_scaled(read::get_attribute_data(parameters, { "cy=\"" }), 0.0);
-	const double rx = read::to_scaled(read::get_attribute_data(parameters, { "rx=\"" }), 0.0);
-	const double ry = read::to_scaled(read::get_attribute_data(parameters, { "ry=\"" }), 0.0);
+	const double cx = read::to_scaled(read::get_attribute_data(parameters, { "cx=" }), 0.0);
+	const double cy = read::to_scaled(read::get_attribute_data(parameters, { "cy=" }), 0.0);
+	const double rx = read::to_scaled(read::get_attribute_data(parameters, { "rx=" }), 0.0);
+	const double ry = read::to_scaled(read::get_attribute_data(parameters, { "ry=" }), 0.0);
 
 	save_go_to(transform_matrix * (Vec2D{ cx, cy } + Vec2D{ rx, 0.0 }));	//intersection of positive x-axis and ellipse is starting point
 	for (std::size_t step = 1; step <= resolution; step++) {
@@ -988,12 +992,13 @@ void draw::ellipse(Transform_Matrix transform_matrix, std::string_view parameter
 
 void draw::polyline(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	const std::string_view transform_data = get_attribute_data(parameters, { "transform=\"" });
+	std::cout << "draw polyline\n";
+	const std::string_view transform_data = get_attribute_data(parameters, { "transform=" });
 	if (transform_data != "") {
 		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
 	}
 
-	const std::string_view points_view = get_attribute_data(parameters, { "points=\"" });
+	const std::string_view points_view = get_attribute_data(parameters, { "points=" });
 	const std::vector<double> points = from_csv(points_view);
 	assert(points.size() % 2 == 0);
 
@@ -1008,12 +1013,13 @@ void draw::polyline(Transform_Matrix transform_matrix, std::string_view paramete
 
 void draw::polygon(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	const std::string_view transform_data = get_attribute_data(parameters, { "transform=\"" });
+	std::cout << "draw polygon\n";
+	const std::string_view transform_data = get_attribute_data(parameters, { "transform=" });
 	if (transform_data != "") {
 		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
 	}
 
-	const std::string_view points_view = get_attribute_data(parameters, { "points=\"" });
+	const std::string_view points_view = get_attribute_data(parameters, { "points=" });
 	const std::vector<double> points = from_csv(points_view);
 	assert(points.size() % 2 == 0);
 
@@ -1031,12 +1037,13 @@ void draw::polygon(Transform_Matrix transform_matrix, std::string_view parameter
 
 void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	const std::string_view transform_data = get_attribute_data(parameters, { "transform=\"" });
+	std::cout << "draw path\n";
+	const std::string_view transform_data = get_attribute_data(parameters, { "transform=" });
 	if (transform_data != "") {
 		transform_matrix = transform_matrix * read::get_transform_matrix(transform_data);
 	}
 
-	std::string_view data_view = get_attribute_data(parameters, { "data=\"" });
+	std::string_view data_view = get_attribute_data(parameters, { "data=" });
 	Vec2D current_point = { 0.0, 0.0 };	//as a path always continues from the last point, this is the point the last path element ended (this is not yet transformed)
 	Vec2D current_subpath_begin = { 0.0, 0.0 };
 	bool new_subpath = true;	//information for move to maybe update current_subpath_begin

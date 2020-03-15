@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <iostream>
+#include <functional>
 
 struct Vec2D
 {
@@ -62,3 +63,6 @@ void save_draw_to(Board_Vec point);
 
 //goes to point if this point resides inside view box (does not draw)
 void save_go_to(Board_Vec point);
+
+//allows testing to redirect the output to other places
+void set_output_functions(std::function<void (Board_Vec)> new_draw_to, std::function<void (Board_Vec)> new_go_to);
