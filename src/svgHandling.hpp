@@ -18,6 +18,7 @@ void draw_from_file(const char* const name, double board_width, double board_hei
 
 //assumes str to hold svg and removes comments (everything between "<!--" and "-->")
 //also swaps out newlines within quotes to spaces ("...d=\"M100 100 \n L20 30...\"..." becomes "...d=\"M100 100   L20 30...\"...")
+//and inserts spaces in front of '-', as spaces are used to seperate numbers
 void preprocess_str(std::string& str);
 
 
@@ -256,7 +257,7 @@ namespace path {
 //resolution in draw() determines in how many straight lines the shape is split
 //transform in draw() is matrix needed to transform from current coordinate system to board system
 namespace draw {
-	constexpr std::size_t default_res = 20;
+	constexpr std::size_t default_res = 1;
 
 	void line     (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
 	void rect     (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);

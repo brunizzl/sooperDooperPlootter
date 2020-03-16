@@ -158,27 +158,34 @@ void preprocess_str(std::string& str)
 		comment_start = str.find("<!--", comment_start);
 	}
 
-	//this part is mainly, because the path attribute may include newlines. 
-	//to keep some readability for debugging, only the newlines inside quotes are replaced.
 	bool inside_quotes = false;
+	bool inside_elem = false;
 	for (auto& pos = str.begin(); pos != str.end(); ++pos) {
 		switch (*pos) {
 		case '\"':
+		case '\'':
 			inside_quotes = !inside_quotes;
 			break;
+		case '<':
+			inside_elem = true;
+			break;
+		case '>':
+			inside_elem = false;
+			break;
 		case '\n':
-			if (inside_quotes) {
-				*pos = ' ';
+			if (inside_elem) {	      //this part is mainly, because the path attribute may include newlines. 
+				*pos = ' ';			  //to keep some readability for debugging, only the newlines inside elements are replaced.
 			}
 			break;
 		case '-':
 			if (inside_quotes) {
 				pos = str.insert(pos, ' ');
-				++pos;	//not at '-' again, end of loop iterates over '-'
+				++pos;	//now at '-' again, end of increments pos a second time to point at the char after '-'
 			}
+			break;
 		}
 	}
-	assert(!inside_quotes);	//there should be an even number of '\"' in the string.
+	assert(!inside_quotes);	//there should be an even number of '\"' (or '\'') in the string.
 }
 
 
@@ -304,8 +311,8 @@ Transform_Matrix View_Box::set(std::string_view data, double board_width, double
 
 bool View_Box::contains(Board_Vec point)
 {
-	return point.x >= View_Box::min.x && point.x <= View_Box::max.x &&
-		point.y >= View_Box::min.y && point.y <= View_Box::max.y;
+	return point.x > View_Box::min.x && point.x < View_Box::max.x &&
+		point.y > View_Box::min.y && point.y < View_Box::max.y;
 }
 
 
@@ -649,9 +656,7 @@ Path_Elem_data path::take_next_elem(std::string_view& view)
 	return result;
 }
 
-//current_point_of_reference is point relative coordiantes are specified relative to.
-//in the begin, this is also the current position of the plotter.
-Vec2D path::process_quadr_bezier(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point_of_reference)
+Vec2D path::process_quadr_bezier(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point)
 {
 	Bezier_Data curve = take_next_bezier(data.content);
 	Vec2D last_control_point = Vec2D::no_value;
@@ -661,51 +666,45 @@ Vec2D path::process_quadr_bezier(const Transform_Matrix& transform_matrix, Path_
 		if (curve.control_data == Control_Given::expl) {
 			assert(points.size() % 4 == 0);
 
-			Vec2D current_pos = current_point_of_reference;		//relevant to draw next bezier, starting at current_pos
 			for (std::size_t i = 0; i < points.size(); i += 4) {
 				const Vec2D control = curve.coords_type == Coords_Type::absolute ?
 					Vec2D{ points[i], points[i + 1] } :
-					current_point_of_reference + Vec2D{ points[i], points[i + 1] };
+					current_point + Vec2D{ points[i], points[i + 1] };
 
 				const Vec2D end = curve.coords_type == Coords_Type::absolute ?
 					Vec2D{ points[i + 2], points[i + 3] } :
-					current_point_of_reference + Vec2D{ points[i + 2], points[i + 3] };
+					current_point + Vec2D{ points[i + 2], points[i + 3] };
 
-				draw::quadr_bezier(transform_matrix * current_pos, transform_matrix * control, transform_matrix * end);
-				current_pos = end;
+				draw::quadr_bezier(transform_matrix * current_point, transform_matrix * control, transform_matrix * end);
+				current_point = end;
 				last_control_point = control;	//not used in this loop, but the loop for implicit control points
 			}
-			current_point_of_reference = current_pos;	//polybezier is finished -> current position becomes new point of reference for relative coords
 		}
 		if (curve.control_data == Control_Given::impl) {
 			assert(points.size() % 2 == 0);
 			if (last_control_point == Vec2D::no_value) {
-				last_control_point = current_point_of_reference;	//current_point_of_reference is also current position
+				last_control_point = current_point;	//current_point is also current position
 			}
 
-			Vec2D current_pos = current_point_of_reference;		//relevant to draw next bezier, starting at current_pos
 			for (std::size_t i = 0; i < points.size(); i += 2) {
-				const Vec2D control = calculate_contol_point(last_control_point, current_pos);
+				const Vec2D control = calculate_contol_point(last_control_point, current_point);
 
 				const Vec2D end = curve.coords_type == Coords_Type::absolute ?
 					Vec2D{ points[i], points[i + 1] } :
-					current_point_of_reference + Vec2D{ points[i], points[i + 1] };
+					current_point + Vec2D{ points[i], points[i + 1] };
 
-				draw::quadr_bezier(transform_matrix * current_pos, transform_matrix * control, transform_matrix * end);
-				current_pos = end;
+				draw::quadr_bezier(transform_matrix * current_point, transform_matrix * control, transform_matrix * end);
+				current_point = end;
 				last_control_point = control;
 			}
-			current_point_of_reference = current_pos;	//polybezier is finished -> current position becomes new point of reference for relative coords
 		}
 
 		curve = take_next_bezier(data.content);
 	}
-	return current_point_of_reference;
+	return current_point;
 }
 
-//current_point_of_reference is point relative coordiantes are specified relative to.
-//in the begin, this is also the current position of the plotter.
-Vec2D path::process_cubic_bezier(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point_of_reference)
+Vec2D path::process_cubic_bezier(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point)
 {
 	Bezier_Data curve = take_next_bezier(data.content);
 	Vec2D last_control_point = Vec2D::no_value;
@@ -715,54 +714,50 @@ Vec2D path::process_cubic_bezier(const Transform_Matrix& transform_matrix, Path_
 		if (curve.control_data == Control_Given::expl) {
 			assert(points.size() % 6 == 0);
 
-			Vec2D current_pos = current_point_of_reference;		//relevant to draw next bezier, starting at current_pos
 			for (std::size_t i = 0; i < points.size(); i += 6) {
 				const Vec2D control_1 = curve.coords_type == Coords_Type::absolute ?
 					Vec2D{ points[i], points[i + 1] } :
-					current_point_of_reference + Vec2D{ points[i], points[i + 1] };
+					current_point + Vec2D{ points[i], points[i + 1] };
 
 				const Vec2D control_2 = curve.coords_type == Coords_Type::absolute ?
 					Vec2D{ points[i + 2], points[i + 3] } :
-					current_point_of_reference + Vec2D{ points[i + 2], points[i + 3] };
+					current_point + Vec2D{ points[i + 2], points[i + 3] };
 
 				const Vec2D end = curve.coords_type == Coords_Type::absolute ?
 					Vec2D{ points[i + 4], points[i + 5] } :
-					current_point_of_reference + Vec2D{ points[i + 4], points[i + 5] };
+					current_point + Vec2D{ points[i + 4], points[i + 5] };
 
-				draw::cubic_bezier(transform_matrix * current_pos, transform_matrix * control_1, transform_matrix * control_2, transform_matrix * end);
-				current_pos = end;
+				draw::cubic_bezier(transform_matrix * current_point, transform_matrix * control_1, transform_matrix * control_2, transform_matrix * end);
+				current_point = end;
 				last_control_point = control_2;	//not used in this loop, but the loop for implicit control points
 			}
-			current_point_of_reference = current_pos;	//polybezier is finished -> current position becomes new point of reference for relative coords
 		}
 		if (curve.control_data == Control_Given::impl) {
 			assert(points.size() % 4 == 0);
 			if (last_control_point == Vec2D::no_value) {
-				last_control_point = current_point_of_reference;	//current_point_of_reference is also current position
+				last_control_point = current_point;
 			}
 
-			Vec2D current_pos = current_point_of_reference;		//relevant to draw next bezier, starting at current_pos
 			for (std::size_t i = 0; i < points.size(); i += 4) {
-				const Vec2D control_1 = calculate_contol_point(last_control_point, current_pos);
+				const Vec2D control_1 = calculate_contol_point(last_control_point, current_point);
 
 				const Vec2D control_2 = curve.coords_type == Coords_Type::absolute ?
 					Vec2D{ points[i], points[i + 1] } :
-					current_point_of_reference + Vec2D{ points[i], points[i + 1] };
+					current_point + Vec2D{ points[i], points[i + 1] };
 
 				const Vec2D end = curve.coords_type == Coords_Type::absolute ?
 					Vec2D{ points[i + 2], points[i + 3] } :
-					current_point_of_reference + Vec2D{ points[i + 2], points[i + 3] };
+					current_point + Vec2D{ points[i + 2], points[i + 3] };
 
-				draw::cubic_bezier(transform_matrix * current_pos, transform_matrix * control_1, transform_matrix * control_2, transform_matrix * end);
-				current_pos = end;
+				draw::cubic_bezier(transform_matrix * current_point, transform_matrix * control_1, transform_matrix * control_2, transform_matrix * end);
+				current_point = end;
 				last_control_point = control_2;
 			}
-			current_point_of_reference = current_pos;	//polybezier is finished -> current position becomes new point of reference for relative coords
 		}
 		curve = take_next_bezier(data.content);
 	}
 
-	return current_point_of_reference;
+	return current_point;
 }
 
 Vec2D path::calculate_contol_point(Vec2D last_control_point, Vec2D mirror)
@@ -1022,8 +1017,7 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 
 	std::string_view data_view = get_attribute_data(parameters, { "d=" });
 	Vec2D current_point = { 0.0, 0.0 };	//as a path always continues from the last point, this is the point the last path element ended (this is not yet transformed)
-	Vec2D current_subpath_begin = { 0.0, 0.0 };
-	bool new_subpath = true;	//information for move to maybe update current_subpath_begin
+	Vec2D current_subpath_begin = { 0.0, 0.0 };	//called initial point by w3
 	Path_Elem_data next_elem = path::take_next_elem(data_view);
 
 	while (next_elem.type != Path_Elem::end) {
@@ -1042,9 +1036,7 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 					current_point + Vec2D{ data[0], data[1] };
 				save_go_to(transform_matrix * next_point);
 				current_point = next_point;
-				if (new_subpath) {
-					current_subpath_begin = current_point;
-				}
+				current_subpath_begin = current_point;
 			}
 			for (std::size_t i = 2; i < data.size(); i += 2) {
 				const Vec2D next_point = next_elem.coords_type == Coords_Type::absolute ?
@@ -1053,7 +1045,6 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 				draw::path_line(transform_matrix * current_point, transform_matrix * next_point);
 				current_point = next_point;
 			}
-			new_subpath = false;
 			break;
 
 		case Path_Elem::vertical_line:
@@ -1065,7 +1056,6 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 				draw::path_line(transform_matrix * current_point, transform_matrix * next_point);
 				current_point = next_point;
 			}
-			new_subpath = false;
 			break;
 
 		case Path_Elem::horizontal_line:
@@ -1077,7 +1067,6 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 				draw::path_line(transform_matrix * current_point, transform_matrix * next_point);
 				current_point = next_point;
 			}
-			new_subpath = false;
 			break;
 
 		case Path_Elem::line:
@@ -1089,28 +1078,23 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 						Vec2D{ data[i], data[i + 1] } :
 						current_point + Vec2D{ data[i], data[i + 1] };
 					draw::path_line(transform_matrix * current_point, transform_matrix * next_point);
+					current_point = next_point;
 				}
-				current_point = next_point;	//w3 specifies a polyline drawn relative has all positions relative to the start of the polyline -> only update current here
 			}
-			new_subpath = false;
 			break;
 
 		case Path_Elem::arc: 
 			current_point = process_arc(transform_matrix, next_elem, current_point);
-			new_subpath = false;
 			break;
 		case Path_Elem::quadr_bezier: 
 			current_point = process_quadr_bezier(transform_matrix, next_elem, current_point);
-			new_subpath = false;
 			break;
 		case Path_Elem::cubic_bezier:
 			current_point = process_cubic_bezier(transform_matrix, next_elem, current_point);
-			new_subpath = false;
 			break;
 		case Path_Elem::closed:
 			draw::path_line(transform_matrix * current_point, transform_matrix * current_subpath_begin);
-			//current_subpath_begin is same as begin of last (just finished) subpath, but may be changed from directly following move command
-			new_subpath = true;
+			current_point = current_subpath_begin;
 			break;
 		}
 		next_elem = path::take_next_elem(data_view);

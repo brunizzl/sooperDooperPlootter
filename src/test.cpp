@@ -88,15 +88,15 @@ void BMP::save_as(const char* const name)
 void test::svg_to_bmp(const char * const input_name, const char* const output_name, double board_width, double board_height)
 {
 	//finding out how often draw_to is called
-	unsigned int amount_points = 0;
-	std::function count_points = [&amount_points](Board_Vec point) {amount_points++; };
-	std::function do_nothing = [](Board_Vec point) {; };
+	//unsigned int amount_points = 0;
+	//std::function count_points = [&amount_points](Board_Vec point) {amount_points++; };
+	//std::function do_nothing = [](Board_Vec point) {; };
+	//
+	//set_output_functions(count_points, do_nothing);
+	//draw_from_file(input_name, board_width, board_height);
 
-	set_output_functions(count_points, do_nothing);
-	draw_from_file(input_name, board_width, board_height);
-
-	const double hue_per_point = 1.99 * pi / amount_points;	//
-	HSV point_color(0, 1, 1);
+	//const double hue_per_point = 1.99 * pi / amount_points;	
+	//HSV point_color(0, 1, 1);
 
 	BMP picture(board_width, board_height, { 130, 130, 130 });
 
@@ -105,16 +105,17 @@ void test::svg_to_bmp(const char * const input_name, const char* const output_na
 
 	std::function draw_to = [&](Board_Vec point) {
 		double gradient = (point.y - current.y) / (point.x - current.x);
+		const RGB random_color = { rand() % 255, rand() % 255, rand() % 255 };
 		if (std::abs(gradient) < 1) {
 			const double y_axis_offset = point.y - gradient * point.x;
 			if (current.x < point.x) {
 				for (int x = current.x; x <= point.x; x++) {
-					picture.set_pixel(x, gradient * x + y_axis_offset, point_color);
+					picture.set_pixel(x, gradient * x + y_axis_offset, random_color);
 				}
 			}
 			else {
 				for (int x = current.x; x >= point.x; x--) {
-					picture.set_pixel(x, gradient * x + y_axis_offset, point_color);
+					picture.set_pixel(x, gradient * x + y_axis_offset, random_color);
 				}
 			}
 		}
@@ -123,19 +124,19 @@ void test::svg_to_bmp(const char * const input_name, const char* const output_na
 			const double x_axis_offset = point.x - gradient * point.y;
 			if (current.y < point.y) {
 				for (int y = current.y; y <= point.y; y++) {
-					picture.set_pixel(gradient * y + x_axis_offset, y, point_color);
+					picture.set_pixel(gradient * y + x_axis_offset, y, random_color);
 				}
 			}
 			else {
 				for (int y = current.y; y >= point.y; y--) {
-					picture.set_pixel(gradient * y + x_axis_offset, y, point_color);
+					picture.set_pixel(gradient * y + x_axis_offset, y, random_color);
 				}
 			}
+
 			current = point;
 		}
-
 		current = point; 
-		point_color.hue += hue_per_point;
+		//point_color.hue += hue_per_point;
 	};
 	std::function go_to = [&](Board_Vec point) {
 		current = point;
