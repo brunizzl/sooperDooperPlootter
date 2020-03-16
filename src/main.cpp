@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include "svgHandling.hpp"
-#include "test.hpp"
+//#include "test.hpp"
 
 int main(int argc, char* argv[])
 {
@@ -31,11 +31,13 @@ int main(int argc, char* argv[])
 	//test::svg_to_bmp("samples/test11.svg", "samples/bmps/test11.bmp", width, height);
 	//test::svg_to_bmp("samples/test12.svg", "samples/bmps/test12.bmp", width, height);
 	//test::svg_to_bmp("samples/test13.svg", "samples/bmps/test13.bmp", width, height);
-	test::svg_to_bmp("samples/test14.svg", "samples/bmps/test14.bmp", width, height);
+	//test::svg_to_bmp("samples/test14.svg", "samples/bmps/test14.bmp", width, height);
 	//test::svg_to_bmp("samples/test15.svg", "samples/bmps/test15.bmp", width, height);
 	//test::svg_to_bmp("samples/test16.svg", "samples/bmps/test16.bmp", width, height);
 	//test::svg_to_bmp("samples/test17.svg", "samples/bmps/test17.bmp", width, height);
 
+	set_output_functions(BASHEYS_DRAW_DO, BASHEYS_GO_TO);
+	draw_from_file("samples/w3test1.svg", BREITE_IN_MM, HOEHE_IN_MM);
 
 	//std::cin.get();
 }
