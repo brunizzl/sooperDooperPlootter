@@ -96,16 +96,17 @@ void test::svg_to_bmp(const char * const input_name, const char* const output_na
 	draw_from_file(input_name, board_width, board_height);
 
 	const double hue_per_point = 1.99 * pi / amount_points;	
-	HSV point_color(0, 1, 1);
+	HSV hsv_color(0, 1, 1);
 
-	BMP picture(board_width, board_height, { 130, 130, 130 });
+	BMP picture(static_cast<uint16_t>(board_width), static_cast<uint16_t>(board_height), { 130, 130, 130 });
 
 	Board_Vec current(0, 0);
 
 
 	std::function draw_to = [&](Board_Vec point) {
 		double gradient = (point.y - current.y) / (point.x - current.x);
-		const RGB random_color = { rand() % 255, rand() % 255, rand() % 255 };
+		//const RGB random_color = { rand() % 255, rand() % 255, rand() % 255 }; //can be used as an alternative to point_color
+		const auto point_color = hsv_color;	//please switch the desired color here
 		if (std::abs(gradient) < 1) {
 			const double y_axis_offset = point.y - gradient * point.x;
 			if (current.x < point.x) {
@@ -132,11 +133,9 @@ void test::svg_to_bmp(const char * const input_name, const char* const output_na
 					picture.set_pixel(gradient * y + x_axis_offset, y, point_color);
 				}
 			}
-
-			current = point;
 		}
 		current = point; 
-		point_color.hue += hue_per_point;
+		hsv_color.hue += hue_per_point;
 	};
 	std::function go_to = [&](Board_Vec point) {
 		current = point;

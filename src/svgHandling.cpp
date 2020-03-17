@@ -160,7 +160,7 @@ void preprocess_str(std::string& str)
 
 	bool inside_quotes = false;
 	bool inside_elem = false;
-	for (auto& pos = str.begin(); pos != str.end(); ++pos) {
+	for (auto pos = str.begin(); pos != str.end(); ++pos) {
 		switch (*pos) {
 		case '\"':
 		case '\'':
@@ -868,7 +868,7 @@ void draw::line(Transform_Matrix transform_matrix, std::string_view parameters, 
 	const Board_Vec start = transform_matrix * Vec2D{ x1, y1 };
 	const Board_Vec end = transform_matrix * Vec2D{ x2, y2 };
 	save_go_to(start);
-	path_line(start, end);
+	linear_bezier(start, end);
 }
 
 void draw::rect(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
@@ -902,11 +902,11 @@ void draw::rect(Transform_Matrix transform_matrix, std::string_view parameters, 
 		//           |         |
 		//            ---(3)---
 		
-		save_go_to(upper_right);								//start
-		path_line(upper_right, upper_left, resolution);			//(1)
-		path_line(upper_left, lower_left, resolution);			//(2)
-		path_line(lower_left, lower_right, resolution);			//(3)
-		path_line(lower_right, upper_right, resolution);		//(4)
+		save_go_to(upper_right);								    //start
+		linear_bezier(upper_right, upper_left, resolution);			//(1)
+		linear_bezier(upper_left, lower_left, resolution);			//(2)
+		linear_bezier(lower_left, lower_right, resolution);			//(3)
+		linear_bezier(lower_right, upper_right, resolution);		//(4)
 	}
 	else {	//draw rectangle with corners rounded of
 		//these two points are the center point of the upper right ellipse (arc) and the lower left ellipse respectively
@@ -926,15 +926,15 @@ void draw::rect(Transform_Matrix transform_matrix, std::string_view parameters, 
 		//              (4)--(5)--(6)		
 		//with X beeing center_upper_right and center_lower_left
 
-		save_go_to(transform_matrix * Vec2D{ right_x, upper_y - ry });			                                         //start
-		path_line(transform_matrix * Vec2D{ right_x, upper_y - ry }, transform_matrix * Vec2D{ left_x, upper_y - ry });	 //(1)
-		arc(transform_matrix, { left_x, upper_y }, rx, ry, pi / 2, pi, Rotation::positive);                              //(2)
-		path_line(transform_matrix * Vec2D{ left_x - rx, upper_y }, transform_matrix * Vec2D{ left_x - rx, lower_y });	 //(3)
-		arc(transform_matrix, { left_x, lower_y }, rx, ry, pi, -pi / 2, Rotation::positive);	                         //(4)
-		path_line(transform_matrix * Vec2D{ left_x, lower_y + ry }, transform_matrix * Vec2D{ right_x, lower_y + ry });	 //(5)
-		arc(transform_matrix, { right_x, lower_y }, rx, ry, -pi / 2, 0, Rotation::positive);	                         //(6)
-		path_line(transform_matrix * Vec2D{ right_x + rx, lower_y }, transform_matrix * Vec2D{ right_x + rx, upper_y }); //(7)
-		arc(transform_matrix, { right_x, upper_y }, rx, ry, 0, pi / 2, Rotation::positive);                              //(8)
+		save_go_to(transform_matrix * Vec2D{ right_x, upper_y - ry });			                                             //start
+		linear_bezier(transform_matrix * Vec2D{ right_x, upper_y - ry }, transform_matrix * Vec2D{ left_x, upper_y - ry });	 //(1)
+		arc(transform_matrix, { left_x, upper_y }, rx, ry, pi / 2, pi, Rotation::positive);                                  //(2)
+		linear_bezier(transform_matrix * Vec2D{ left_x - rx, upper_y }, transform_matrix * Vec2D{ left_x - rx, lower_y });	 //(3)
+		arc(transform_matrix, { left_x, lower_y }, rx, ry, pi, -pi / 2, Rotation::positive);	                             //(4)
+		linear_bezier(transform_matrix * Vec2D{ left_x, lower_y + ry }, transform_matrix * Vec2D{ right_x, lower_y + ry });	 //(5)
+		arc(transform_matrix, { right_x, lower_y }, rx, ry, -pi / 2, 0, Rotation::positive);	                             //(6)
+		linear_bezier(transform_matrix * Vec2D{ right_x + rx, lower_y }, transform_matrix * Vec2D{ right_x + rx, upper_y }); //(7)
+		arc(transform_matrix, { right_x, upper_y }, rx, ry, 0, pi / 2, Rotation::positive);                                  //(8)
 	}
 }
 
@@ -984,7 +984,7 @@ void draw::polyline(Transform_Matrix transform_matrix, std::string_view paramete
 	save_go_to(start);
 	for (std::size_t i = 2; i < points.size(); i += 2) {
 		const Board_Vec end = transform_matrix * Vec2D{ points[i], points[i + 1] };
-		path_line(start, end);
+		linear_bezier(start, end);
 		start = end;
 	}
 }
@@ -1003,11 +1003,11 @@ void draw::polygon(Transform_Matrix transform_matrix, std::string_view parameter
 	save_go_to(start);
 	for (std::size_t i = 2; i < points.size(); i += 2) {
 		end = transform_matrix * Vec2D{ points[i], points[i + 1] };
-		path_line(start, end);
+		linear_bezier(start, end);
 		start = end;
 	}
 	end = transform_matrix * Vec2D{ points[0], points[1] };	//polygon is closed -> last operation is to connect to first point
-	path_line(start, end);
+	linear_bezier(start, end);
 }
 
 void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
@@ -1042,7 +1042,7 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 				const Vec2D next_point = next_elem.coords_type == Coords_Type::absolute ?
 					Vec2D{ data[i], data[i + 1] } :
 					current_point + Vec2D{ data[i], data[i + 1] };
-				draw::path_line(transform_matrix * current_point, transform_matrix * next_point);
+				draw::linear_bezier(transform_matrix * current_point, transform_matrix * next_point);
 				current_point = next_point;
 			}
 			break;
@@ -1053,7 +1053,7 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 				const Vec2D next_point = next_elem.coords_type == Coords_Type::absolute ?
 					Vec2D{ current_point.x, data.back() } :
 					Vec2D{ current_point.x, current_point.y + data.back() };
-				draw::path_line(transform_matrix * current_point, transform_matrix * next_point);
+				draw::linear_bezier(transform_matrix * current_point, transform_matrix * next_point);
 				current_point = next_point;
 			}
 			break;
@@ -1064,7 +1064,7 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 				const Vec2D next_point = next_elem.coords_type == Coords_Type::absolute ?
 					Vec2D{ data.back(), current_point.y } :
 					Vec2D{ current_point.x + data.back(), current_point.y };
-				draw::path_line(transform_matrix * current_point, transform_matrix * next_point);
+				draw::linear_bezier(transform_matrix * current_point, transform_matrix * next_point);
 				current_point = next_point;
 			}
 			break;
@@ -1077,7 +1077,7 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 					next_point = next_elem.coords_type == Coords_Type::absolute ?
 						Vec2D{ data[i], data[i + 1] } :
 						current_point + Vec2D{ data[i], data[i + 1] };
-					draw::path_line(transform_matrix * current_point, transform_matrix * next_point);
+					draw::linear_bezier(transform_matrix * current_point, transform_matrix * next_point);
 					current_point = next_point;
 				}
 			}
@@ -1093,7 +1093,7 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 			current_point = process_cubic_bezier(transform_matrix, next_elem, current_point);
 			break;
 		case Path_Elem::closed:
-			draw::path_line(transform_matrix * current_point, transform_matrix * current_subpath_begin);
+			draw::linear_bezier(transform_matrix * current_point, transform_matrix * current_subpath_begin);
 			current_point = current_subpath_begin;
 			break;
 		}
@@ -1116,11 +1116,11 @@ void draw::arc(const Transform_Matrix& transform_matrix, Vec2D center, double rx
 	}
 }
 
-void draw::path_line(Board_Vec start, Board_Vec end, std::size_t resolution)
+void draw::linear_bezier(Board_Vec start, Board_Vec end, std::size_t resolution)
 {
 	for (std::size_t step = 1; step <= resolution; step++) {
 		//as given in wikipedia for linear bezier curves: https://en.wikipedia.org/wiki/B%C3%A9zier_curve#Linear_B%C3%A9zier_curves
-		const double t = step / (double)resolution;
+		const double t = step / static_cast<double>(resolution);
 		save_draw_to(start + t * (end - start));
 	}
 }
@@ -1129,7 +1129,7 @@ void draw::quadr_bezier(Board_Vec start, Board_Vec control, Board_Vec end, std::
 {
 	for (std::size_t step = 1; step <= resolution; step++) {
 		//formula taken from https://en.wikipedia.org/wiki/B%C3%A9zier_curve#Quadratic_B%C3%A9zier_curves
-		const double t = step / (double)resolution;
+		const double t = step / static_cast<double>(resolution);
 		const Board_Vec waypoint = (1 - t) * (1 - t) * start + 2 * (1 - t) * t * control + t * t * end;
 		save_draw_to(waypoint);
 	}
@@ -1139,7 +1139,7 @@ void draw::cubic_bezier(Board_Vec start, Board_Vec control_1, Board_Vec control_
 {
 	for (std::size_t step = 1; step <= resolution; step++) {
 		//formula taken from https://en.wikipedia.org/wiki/B%C3%A9zier_curve#Cubic_B%C3%A9zier_curves
-		const double t = step / (double)resolution;
+		const double t = step / static_cast<double>(resolution);
 		const double tpow2 = t * t;
 		const double onet = (1 - t);
 		const double onetpow2 = onet * onet;

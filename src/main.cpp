@@ -1,14 +1,14 @@
 #include <iostream>
 
 #include "svgHandling.hpp"
-//#include "test.hpp"
+#include "test.hpp"
 
 int main(int argc, char* argv[])
 {
-	const double width = 750;
-	const double height = 1360;
-	//test::svg_to_bmp("samples/rect01.svg", "samples/bmps/rect01.bmp", width, height);
-	//test::svg_to_bmp("samples/rect02.svg", "samples/bmps/rect02.bmp", width, height);
+	const double width = 1000;
+	const double height = 1000;
+	test::svg_to_bmp("samples/rect01.svg", "samples/bmps/rect01.bmp", width, height);
+	test::svg_to_bmp("samples/rect02.svg", "samples/bmps/rect02.bmp", width, height);
 	//test::svg_to_bmp("samples/circle01.svg", "samples/bmps/circle01.bmp", width, height);
 	//test::svg_to_bmp("samples/ellipse01.svg", "samples/bmps/ellipse01.bmp", width, height);
 	//test::svg_to_bmp("samples/line01.svg", "samples/bmps/line01.bmp", width, height);
@@ -36,8 +36,8 @@ int main(int argc, char* argv[])
 	//test::svg_to_bmp("samples/test16.svg", "samples/bmps/test16.bmp", width, height);
 	//test::svg_to_bmp("samples/test17.svg", "samples/bmps/test17.bmp", width, height);
 
-	set_output_functions(BASHEYS_DRAW_DO, BASHEYS_GO_TO);
-	draw_from_file("samples/w3test1.svg", BREITE_IN_MM, HOEHE_IN_MM);
+	//set_output_functions(BASHEYS_DRAW_DO, BASHEYS_GO_TO);
+	//draw_from_file("samples/w3test1.svg", BREITE_IN_MM, HOEHE_IN_MM);
 
 	//std::cin.get();
 }

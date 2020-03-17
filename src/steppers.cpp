@@ -88,7 +88,7 @@ std::ostream& operator<<(std::ostream& stream, Board_Vec& coord)
 //stores if the last move command could be exected or was ignored because it lead outside the view box
 static bool prev_in_view_box = true;
 
-//hier bitte basheys funktionen 
+
 static std::function<void(Board_Vec)> draw_to = [](Board_Vec point) {std::cout << "------" << point << '\n'; };
 static std::function<void(Board_Vec)> go_to   = [](Board_Vec point) {std::cout << "  ->  " << point << '\n'; };
 

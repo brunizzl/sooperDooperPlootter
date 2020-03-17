@@ -282,7 +282,7 @@ namespace draw {
 	void arc(const Transform_Matrix& transform_matrix, Vec2D center, double rx, double ry, double start_angle,
 		double end_angle, Rotation rotation, std::size_t resolution = default_res);
 
-	void path_line(Board_Vec start, Board_Vec end, std::size_t resolution = default_res);
+	void linear_bezier(Board_Vec start, Board_Vec end, std::size_t resolution = default_res);
 	void quadr_bezier(Board_Vec start, Board_Vec control, Board_Vec end, std::size_t resolution = default_res);
 	void cubic_bezier(Board_Vec start, Board_Vec control_1, Board_Vec control_2, Board_Vec end, std::size_t resolution = default_res);
 }
