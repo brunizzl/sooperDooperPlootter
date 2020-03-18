@@ -14,7 +14,7 @@ constexpr double pi = 3.1415926535897932384626433832795028841971;
 // "main" function
 //reads svg at file path "name" and moves plotter accordingly
 // board_width and board_height are the dimensions of the board the plotter draws on in mm
-void draw_from_file(const char* const name, double board_width, double board_height);
+void draw_from_file(const char* name, double board_width, double board_height);
 
 //assumes str to hold svg and removes comments (everything between "<!--" and "-->")
 //also swaps out newlines within quotes to spaces ("...d=\"M100 100 \n L20 30...\"..." becomes "...d=\"M100 100   L20 30...\"...")
@@ -165,6 +165,12 @@ namespace read {
 	//returns Elem_Data of next element and shortens view to after the current element
 	Elem_Data take_next_elem(std::string_view& view);
 
+	//opens file with name file_name and reads full file in as string
+	std::string string_from_file(const char* file_name);
+
+	//sets view box and calls functions for elements in svg
+	void evaluate_svg(std::string_view svg_view, double board_width, double board_height);
+
 	//reads all of fragment
 	void evaluate_fragment(std::string_view fragment, const Transform_Matrix& transform);
 
@@ -213,10 +219,10 @@ namespace path {
 	Path_Elem_data take_next_elem(std::string_view& view);
 
 	//do the drawing of as much bezier curves as data can deliver
-	//current_point_of_reference is current position of plotter
-	//return where they finnished drawing.
-	Vec2D process_quadr_bezier(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point_of_reference);
-	Vec2D process_cubic_bezier(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point_of_reference);
+	//current_point is current position of plotter
+	//return where they finnished drawing (the new current_point).
+	Vec2D process_quadr_bezier(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point);
+	Vec2D process_cubic_bezier(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point);
 
 	//control point is given explicitly -> set to expl
 	//control point is to be calculated from the last control point -> set to impl
@@ -248,7 +254,7 @@ namespace path {
 
 	//analogous to process_bezier() functions
 	//see here how to calculate: https://www.w3.org/TR/SVG11/paths.html#PathDataEllipticalArcCommands
-	Vec2D process_arc(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point_of_reference);
+	Vec2D process_arc(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point);
 }
 
 

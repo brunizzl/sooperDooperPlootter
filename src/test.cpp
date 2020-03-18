@@ -80,25 +80,30 @@ void BMP::set_pixel(uint16_t x, uint16_t y, HSV color)
 	picture[y * width + x] = color.to_rgb().to_int();
 }
 
-void BMP::save_as(const char* const name)
+void BMP::save_as(const char* name)
 {
 	bmp_create(name, this->picture, this->width, this->height);
 }
 
-void test::svg_to_bmp(const char * const input_name, const char* const output_name, double board_width, double board_height)
+void test::svg_to_bmp(const char * input_name, const char* output_name, double board_width, double board_height)
 {
+	//reading in file
+	std::cout << "\nreading in " << input_name << " ...\n";
+	std::string str = read::string_from_file(input_name);
+	preprocess_str(str);
+	//std::cout << str << "\n\n";
+
 	//finding out how often draw_to is called
 	unsigned int amount_points = 0;
 	std::function count_points = [&amount_points](Board_Vec point) {amount_points++; };
-	std::function do_nothing = [](Board_Vec point) {; };
-	
+	std::function do_nothing = [](Board_Vec point) {; };	
 	set_output_functions(count_points, do_nothing);
-	draw_from_file(input_name, board_width, board_height);
+	read::evaluate_svg({ str.c_str(), str.length() }, board_width, board_height);
 
-	const double hue_per_point = 1.99 * pi / amount_points;	
+	const double hue_per_point = 1.99 * pi / amount_points;	//just stay under 2 * pi, to not risk hue beeing slightly over 2 * pi in last point, due to rounding error
 	HSV hsv_color(0, 1, 1);
 
-	BMP picture(static_cast<uint16_t>(board_width), static_cast<uint16_t>(board_height), { 130, 130, 130 });
+	BMP picture(static_cast<uint16_t>(board_width), static_cast<uint16_t>(board_height), { 80, 80, 80 });
 
 	Board_Vec current(0, 0);
 
@@ -141,8 +146,11 @@ void test::svg_to_bmp(const char * const input_name, const char* const output_na
 		current = point;
 	};
 
-	set_output_functions(draw_to, go_to);
-	draw_from_file(input_name, board_width, board_height);
 
+	std::cout << "draw picture...\n";
+	set_output_functions(draw_to, go_to);
+	read::evaluate_svg({ str.c_str(), str.length() }, board_width, board_height);
+
+	std::cout << "save picture as " << output_name << " ...\n";
 	picture.save_as(output_name);
 }

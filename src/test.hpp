@@ -22,7 +22,7 @@ public:
 	RGB to_rgb();
 };
 
-
+//bitmap coordinates are same as board coordinates
 class BMP
 {
 	uint16_t width;
@@ -35,11 +35,11 @@ public:
 
 	void set_pixel(uint16_t x, uint16_t y, RGB color);
 	void set_pixel(uint16_t x, uint16_t y, HSV color);
-	void save_as(const char* const name);
+	void save_as(const char* name);
 };
 
 namespace test {
 
-	void svg_to_bmp(const char * const input_name, const char* const output_name, double board_width, double board_height);
+	void svg_to_bmp(const char * input_name, const char* output_name, double board_width, double board_height);
 	
 }

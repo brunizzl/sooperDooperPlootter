@@ -98,7 +98,7 @@ std::string_view in_between(std::string_view original, std::size_t fst, std::siz
 
 //returns whether traversing the angle smaller than pi radiants between fst and snd 
 //is done in a mathematical positive rotation or otherwise
-draw::Rotation rotation(Vec2D fst, Vec2D snd)
+draw::Rotation direction_of(Vec2D fst, Vec2D snd)
 {
 	if (fst.x * snd.y - fst.y * snd.x >= 0.0) {
 		return draw::Rotation::positive;
@@ -122,31 +122,11 @@ draw::Rotation operator!(draw::Rotation rot)
 ///////////////////////////////////////////////////////////functions visible from the outside//////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void draw_from_file(const char* const name, double board_width, double board_height)
+void draw_from_file(const char* name, double board_width, double board_height)
 {
-	std::string str;
-	{
-		//taken from: http://insanecoding.blogspot.com/2011/11/how-to-read-in-file-in-c.html
-		std::ifstream filestream(name);
-		if (!filestream) {
-			std::cout << "Error: expected to find file \"" << name << "\" relative to programm path.\n";
-			throw std::exception("Could not open SVG");
-		}
-
-		filestream.seekg(0, std::ios::end);
-		str.resize(static_cast<const std::size_t>(filestream.tellg()));		//static_cast silences type shortening warning
-		filestream.seekg(0, std::ios::beg);
-		filestream.read(&str[0], str.size());
-	}
+	std::string str = read::string_from_file(name);
 	preprocess_str(str);
-	//std::cout << str << std::endl;
-
-	const std::string_view str_view = { str.c_str(), str.length() };
-
-	const std::string_view view_box_data = read::get_attribute_data(str_view, "viewBox=");
-	Transform_Matrix to_board = View_Box::set(view_box_data, board_width, board_height);	
-
-	read::evaluate_fragment(str_view, to_board);
+	read::evaluate_svg({ str.c_str(), str.length() }, board_width, board_height);
 }
 
 void preprocess_str(std::string& str)
@@ -160,8 +140,8 @@ void preprocess_str(std::string& str)
 
 	bool inside_quotes = false;
 	bool inside_elem = false;
-	for (auto pos = str.begin(); pos != str.end(); ++pos) {
-		switch (*pos) {
+	for (auto& ch : str) {
+		switch (ch) {
 		case '\"':
 		case '\'':
 			inside_quotes = !inside_quotes;
@@ -174,18 +154,12 @@ void preprocess_str(std::string& str)
 			break;
 		case '\n':
 			if (inside_elem) {	      //this part is mainly, because the path attribute may include newlines. 
-				*pos = ' ';			  //to keep some readability for debugging, only the newlines inside elements are replaced.
-			}
-			break;
-		case '-':
-			if (inside_quotes) {
-				pos = str.insert(pos, ' ');
-				++pos;	//now at '-' again, end of increments pos a second time to point at the char after '-'
+				ch = ' ';			  //to keep some readability for debugging, only the newlines inside elements are replaced.
 			}
 			break;
 		}
 	}
-	assert(!inside_quotes);	//there should be an even number of '\"' (or '\'') in the string.
+	assert(!inside_quotes && !inside_elem);	//there should be an even number of '\"' (or '\'') in the string.
 }
 
 
@@ -357,7 +331,7 @@ std::string_view read::end_marker(Elem_Type type)
 	case Elem_Type::path:		
 		return { "/>" };
 	case Elem_Type::unknown:	
-		return { ">" };		//just assume the least restricting marker if the type is unknown 
+		return { ">" };		//just assume the less restricting marker if the type is unknown 
 	}
 	assert(false);	//if this assert is hit, you may update the switchcase above.
 	return {};
@@ -408,7 +382,7 @@ std::vector<double> read::from_csv(std::string_view csv)
 
 	std::size_t next_value_start = csv.find_first_of("0123456789.+-");
 	while (next_value_start != std::string::npos) {
-		const std::size_t next_seperator = csv.find_first_of(", ", next_value_start);
+		const std::size_t next_seperator = csv.find_first_of(", -", next_value_start + 1);	//minus may also be used as seperator
 		const std::string_view next_value = in_between(csv, next_value_start - 1, next_seperator);
 		result.push_back(to_scaled(next_value));
 		next_value_start = csv.find_first_of("0123456789.+-", next_seperator);
@@ -473,10 +447,35 @@ Elem_Data read::take_next_elem(std::string_view& view)
 	return { Elem_Type::unknown, "" };
 }
 
+std::string read::string_from_file(const char* file_name)
+{
+	std::string str;
+	{
+		//taken from: http://insanecoding.blogspot.com/2011/11/how-to-read-in-file-in-c.html
+		std::ifstream filestream(file_name);
+		if (!filestream) {
+			std::cout << "Error: expected to find file \"" << file_name << "\" relative to programm path.\n";
+			throw std::exception("Could not open SVG");
+		}
+
+		filestream.seekg(0, std::ios::end);
+		str.resize(static_cast<const std::size_t>(filestream.tellg()));		//static_cast silences type shortening warning
+		filestream.seekg(0, std::ios::beg);
+		filestream.read(&str[0], str.size());
+	}
+	return str;
+}
+
+void read::evaluate_svg(std::string_view svg_view, double board_width, double board_height)
+{
+	const std::string_view view_box_data = read::get_attribute_data(svg_view, "viewBox=");
+	Transform_Matrix to_board = View_Box::set(view_box_data, board_width, board_height);
+
+	read::evaluate_fragment(svg_view, to_board);
+}
+
 void read::evaluate_fragment(std::string_view fragment, const Transform_Matrix& transform)
 {
-	//std::cout << "\n\nevaluate_fragment():\n" << fragment << std::endl;
-
 	Elem_Data next;
 	do {
 		next = take_next_elem(fragment);
@@ -791,7 +790,7 @@ Bezier_Data path::take_next_bezier(std::string_view& view)
 	return { "", Control_Given::expl, Coords_Type::absolute };
 }
 
-Vec2D path::process_arc(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point_of_reference)
+Vec2D path::process_arc(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point)
 {
 	const std::vector<double> points = from_csv(data.content);	//data would be a better name than points, but this name is already taken.
 	assert(points.size() == 7);
@@ -801,51 +800,40 @@ Vec2D path::process_arc(const Transform_Matrix& transform_matrix, Path_Elem_data
 	const double phi = to_rad(std::fmod(points[2], 360.0));		//often called x_axis_rotation
 	const bool large_arc_flag = static_cast<bool>(points[3]);	//w3 says any nonzero value is meant as true
 	const bool sweep_flag = static_cast<bool>(points[4]);
-	const double x2 = points[5];
-	const double y2 = points[6];
+	const double x2 = data.coords_type == Coords_Type::absolute ? points[5] : current_point.x + points[5];
+	const double y2 = data.coords_type == Coords_Type::absolute ? points[6] : current_point.y + points[6];
 
-	const double x1 = current_point_of_reference.x;	//names as in reference
-	const double y1 = current_point_of_reference.y;
-
-	//the following is taken from here: https://www.w3.org/TR/SVG11/implnote.html#ArcImplementationNotes
-	//the code assumes to have valid data and will not check if the arc is to small.
-
-	//going from  x1 y1 x2 y2 fA fS rx ry phi  to  cx cy theta1 delta theta: (described a little down on that side)
-
-	//step 1:
-	const Vec2D point1_prime = Matrix2X2{ std::cos(phi), std::sin(phi),
-										 -std::sin(phi), std::cos(phi) } * Vec2D{ (x1 - x2) / 2,
-	                                                                              (y1 - y2) / 2 };
-	const double x1_prime = point1_prime.x;
-	const double y1_prime = point1_prime.y;
-
-	//step 2:
-	const double rx2 = rx * rx;						//the 2s stand for squared
-	const double ry2 = ry * ry;
-	const double x1_prime2 = x1_prime * x1_prime;
-	const double y1_prime2 = y1_prime * y1_prime;
-	const double sign = large_arc_flag != sweep_flag ? 1.0 : -1.0;
-	const Vec2D center_prime = sign * std::sqrt(std::abs((rx2 * ry2 - rx2 * y1_prime2 - ry2 * x1_prime2) /
-		                                           (rx2 * y1_prime2 + ry2 * x1_prime2))) *       Vec2D{	rx* y1_prime / ry, 
-		                                                                                               -ry * x1_prime / rx };
-	//step 3:
-	const Vec2D center = Matrix2X2{ std::cos(phi), -std::sin(phi),
-									std::sin(phi),  std::cos(phi) } *center_prime + Vec2D{ (x1 + x2) / 2,
-	                                                                                       (y1 + y2) / 2 };
-	//step 4:	(note: these are no longer the formulas given in the w3 reference)
-	//the angles are rotated by phi, as the draw::arc() function undoes this rotation.
-	const Vec2D center_to_start = current_point_of_reference - center;			
-	const double start_angle = std::atan2(center_to_start.y, center_to_start.x) + phi;	//w3 calls this angle theta1
-	const Vec2D center_to_end = current_point_of_reference - center;			
-	const double end_angle = std::atan2(center_to_end.y, center_to_end.x) + phi;		//w3 calls this angle theta2 
-
-	//this is now no longer the way given by w3, as i need to find the parameters to plug into my function now
-	const draw::Rotation small_arc_rotation = rotation(center_to_start, center_to_end);
-	const draw::Rotation actual_rotation = large_arc_flag ? !small_arc_rotation : small_arc_rotation;
-
-	const Transform_Matrix from_arc_coordinates = transform_matrix * rotate(phi, center);
-
-	draw::arc(from_arc_coordinates, center, rx, ry, start_angle, end_angle, actual_rotation);
+	//taken from: https://observablehq.com/@jrus/svg-elliptical-arcs
+	//funktioniert noch nicht ganz :(
+	const double
+		c = std::cos(phi),
+		s = std::sin(phi),
+		a = 2.0 * rx,
+		b = 2.0 * ry,
+		ab_inv = 1 / (a * b),
+		qx = (c * c) * (b * b) + (s * s) * (a * a),
+		qy = (s * s) * (b * b) + (c * c) * (a * a),
+		qxy = c * s * (b - a) * (b + a),
+		v2 = (ab_inv * ab_inv) * (qx * x2 * x2 + qy * y2 * y2 + 2 * qxy * x2 * y2),
+		Jvx = ab_inv * (qxy * x2 + qy * y2),
+		Jvy = -ab_inv * (qx * x2 + qxy * y2),
+		rc_sign = 1.0 - 2.0 * (large_arc_flag),
+		rs_sign = -1.0 + 2.0 * (sweep_flag);
+	double rc = 0.0, rs = rs_sign;
+	if (v2 < 1.0) {
+		rc = rc_sign * std::sqrt(1.0 - v2);
+		rs = rs_sign * std::sqrt(v2);
+	}
+	const double rc_m1 = 1.0 - rc;
+	for (double t = 0.03125; t <= 1.0; t += 0.03125) {
+		const double
+			p1 = (rc_m1 * t + rc) * t,
+			p2 = (rs - rs * t) * t,
+			p3_inv = 1.0 / ((rc_m1 * t - rc_m1) * 2.0 * t + 1.0),
+			wc = p1 * p3_inv,
+			ws = p2 * p3_inv;
+		save_draw_to(transform_matrix * (current_point + Vec2D{ x2 * wc + Jvx * ws, y2 * wc + Jvy * ws }));
+	}
 
 	return { x2, y2 };
 }
@@ -857,7 +845,6 @@ using namespace draw;
 
 void draw::line(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	std::cout << "draw line\n";
 	transform_matrix = transform_matrix * read::get_transform_matrix(parameters);
 
 	const double x1 = read::to_scaled(read::get_attribute_data(parameters, { "x1=" }), 0.0);
@@ -873,7 +860,6 @@ void draw::line(Transform_Matrix transform_matrix, std::string_view parameters, 
 
 void draw::rect(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	std::cout << "draw rect\n";
 	transform_matrix = transform_matrix * read::get_transform_matrix(parameters);
 
 	const double x = read::to_scaled(read::get_attribute_data(parameters, { "x=" }), 0.0);
@@ -940,7 +926,6 @@ void draw::rect(Transform_Matrix transform_matrix, std::string_view parameters, 
 
 void draw::circle(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	std::cout << "draw circle\n";
 	transform_matrix = transform_matrix * read::get_transform_matrix(parameters);
 
 	const double cx = read::to_scaled(read::get_attribute_data(parameters, { "cx=" }), 0.0);
@@ -956,7 +941,6 @@ void draw::circle(Transform_Matrix transform_matrix, std::string_view parameters
 
 void draw::ellipse(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	std::cout << "draw ellypse\n";
 	transform_matrix = transform_matrix * read::get_transform_matrix(parameters);
 
 	const double cx = read::to_scaled(read::get_attribute_data(parameters, { "cx=" }), 0.0);
@@ -973,7 +957,6 @@ void draw::ellipse(Transform_Matrix transform_matrix, std::string_view parameter
 
 void draw::polyline(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	std::cout << "draw polyline\n";
 	transform_matrix = transform_matrix * read::get_transform_matrix(parameters);
 
 	const std::string_view points_view = get_attribute_data(parameters, { "points=" });
@@ -991,7 +974,6 @@ void draw::polyline(Transform_Matrix transform_matrix, std::string_view paramete
 
 void draw::polygon(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	std::cout << "draw polygon\n";
 	transform_matrix = transform_matrix * read::get_transform_matrix(parameters);
 
 	const std::string_view points_view = get_attribute_data(parameters, { "points=" });
@@ -1012,7 +994,6 @@ void draw::polygon(Transform_Matrix transform_matrix, std::string_view parameter
 
 void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution)
 {
-	std::cout << "draw path\n";
 	transform_matrix = transform_matrix * read::get_transform_matrix(parameters);
 
 	std::string_view data_view = get_attribute_data(parameters, { "d=" });
