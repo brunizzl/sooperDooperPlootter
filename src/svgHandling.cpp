@@ -792,8 +792,8 @@ Vec2D path::process_arc(const Transform_Matrix& transform_matrix, Path_Elem_data
 
 		//step 1:
 		const auto [x1_prime, y1_prime] = Matrix2X2{ std::cos(phi), std::sin(phi),
-													-std::sin(phi), std::cos(phi) } *Vec2D{ (x1 - x2) / 2,
-																							 (y1 - y2) / 2 };
+		                                            -std::sin(phi), std::cos(phi) } *Vec2D{ (x1 - x2) / 2,
+		                                                                                    (y1 - y2) / 2 };
 		//error correction for to small radii:
 		const double lambda = (x1_prime * x1_prime) / (rx * rx) + (y1_prime * y1_prime) / (ry * ry);
 		if (lambda > 1.0) {
@@ -807,16 +807,13 @@ Vec2D path::process_arc(const Transform_Matrix& transform_matrix, Path_Elem_data
 		const double x1_prime2 = x1_prime * x1_prime;
 		const double y1_prime2 = y1_prime * y1_prime;
 		const double sign = large_arc_flag != sweep_flag ? 1.0 : -1.0;
-		const Vec2D center_prime = sign * std::sqrt(std::abs((rx2 * ry2 - rx2 * y1_prime2 - ry2 * x1_prime2) / 	//in an ideal world abs() is not needed, but negative values can arise from rounding errors.
-			(rx2 * y1_prime2 + ry2 * x1_prime2))) * Vec2D
-		{
-			rx* y1_prime / ry,
-				-ry * x1_prime / rx
-		};
+		const Vec2D center_prime = sign * std::sqrt(std::abs((rx2 * ry2 - rx2 * y1_prime2 - ry2 * x1_prime2) / 	//in an ideal world abs() is not needed, but negative values may arise from rounding errors.
+		                                                        (rx2 * y1_prime2 + ry2 * x1_prime2)))       * Vec2D{ rx * y1_prime / ry,
+		                                                                                                            -ry * x1_prime / rx	};
 		//step 3:
 		const Vec2D center = Matrix2X2{ std::cos(phi), -std::sin(phi),
-										std::sin(phi),  std::cos(phi) } *center_prime + Vec2D{ (x1 + x2) / 2,
-																								(y1 + y2) / 2 };
+		                                std::sin(phi),  std::cos(phi) } * center_prime + Vec2D{ (x1 + x2) / 2,
+		                                                                                        (y1 + y2) / 2 };
 		//step 4:	
 		const Vec2D v1 = Vec2D{ (x1_prime - center_prime.x) / rx,
 								(y1_prime - center_prime.y) / ry };
@@ -824,15 +821,11 @@ Vec2D path::process_arc(const Transform_Matrix& transform_matrix, Path_Elem_data
 								(-y1_prime - center_prime.y) / ry };
 		const double start_angle = angle({ 1, 0 }, v1);			//called theta 1 by w3
 		double delta_angle = angle(v1, v2);		                //called delta theta by w3
-		if (sweep_flag) {
-			if (delta_angle < 0) {
-				delta_angle += 2 * pi;
-			}
+		if (large_arc_flag) {
+			delta_angle += delta_angle > 0 ? -2 * pi : 2 * pi;	//function angle() is guaranteed to return a value in interval (-pi, pi]
 		}
-		else {
-			if (delta_angle > 0) {
-				delta_angle -= 2 * pi;
-			}
+		if (sweep_flag == (delta_angle < 0)) {	//either sweep_flag is set and delta_angle is smaller than 0 or both are false to enter the condition
+			delta_angle *= -1;
 		}
 
 		const Transform_Matrix from_arc_coordinates = transform_matrix * rotate(phi, center);
