@@ -70,13 +70,13 @@ BMP::~BMP()
 
 void BMP::set_pixel(uint16_t x, uint16_t y, RGB color)
 {
-	assert(x < width && y <= height);
+	assert(x < width && y < height);
 	picture[y * width + x] = color.to_int();
 }
 
 void BMP::set_pixel(uint16_t x, uint16_t y, HSV color)
 {
-	assert(x < width && y <= height);
+	assert(x < width && y < height);
 	picture[y * width + x] = color.to_rgb().to_int();
 }
 
@@ -110,7 +110,7 @@ void test::svg_to_bmp(const char * input_name, const char* output_name, double b
 
 	std::function draw_to = [&](Board_Vec point) {
 		double gradient = (point.y - current.y) / (point.x - current.x);
-		//const RGB random_color = { rand() % 255, rand() % 255, rand() % 255 }; //can be used as an alternative to point_color
+		const RGB random_color = { std::rand() % 255, std::rand() % 255, std::rand() % 255 }; //can be used as an alternative to point_color
 		const auto point_color = hsv_color;	//please switch the desired color here
 		if (std::abs(gradient) < 1) {
 			const double y_axis_offset = point.y - gradient * point.x;

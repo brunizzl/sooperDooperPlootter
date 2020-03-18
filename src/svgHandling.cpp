@@ -96,28 +96,6 @@ std::string_view in_between(std::string_view original, std::size_t fst, std::siz
 	}
 }
 
-//returns whether traversing the angle smaller than pi radiants between fst and snd 
-//is done in a mathematical positive rotation or otherwise
-draw::Rotation direction_of(Vec2D fst, Vec2D snd)
-{
-	if (fst.x * snd.y - fst.y * snd.x >= 0.0) {
-		return draw::Rotation::positive;
-	}
-	else {
-		return draw::Rotation::negative;
-	}
-}
-
-draw::Rotation operator!(draw::Rotation rot)
-{
-	if (rot == draw::Rotation::positive) {
-		return draw::Rotation::negative;
-	}
-	else {
-		return draw::Rotation::positive;
-	}
-}
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////functions visible from the outside//////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -285,8 +263,8 @@ Transform_Matrix View_Box::set(std::string_view data, double board_width, double
 
 bool View_Box::contains(Board_Vec point)
 {
-	return point.x > View_Box::min.x && point.x < View_Box::max.x &&
-		point.y > View_Box::min.y && point.y < View_Box::max.y;
+	return point.x > View_Box::min.x && point.x < View_Box::max.x 
+	    && point.y > View_Box::min.y && point.y < View_Box::max.y;
 }
 
 
@@ -795,45 +773,67 @@ Vec2D path::process_arc(const Transform_Matrix& transform_matrix, Path_Elem_data
 	const std::vector<double> points = from_csv(data.content);	//data would be a better name than points, but this name is already taken.
 	assert(points.size() == 7);
 
-	const double rx = std::abs(points[0]);
-	const double ry = std::abs(points[1]);
+	double rx = std::abs(points[0]);		//needs to be able to be updated if to small
+	double ry = std::abs(points[1]);		//needs to be able to be updated if to small
 	const double phi = to_rad(std::fmod(points[2], 360.0));		//often called x_axis_rotation
 	const bool large_arc_flag = static_cast<bool>(points[3]);	//w3 says any nonzero value is meant as true
 	const bool sweep_flag = static_cast<bool>(points[4]);
 	const double x2 = data.coords_type == Coords_Type::absolute ? points[5] : current_point.x + points[5];
 	const double y2 = data.coords_type == Coords_Type::absolute ? points[6] : current_point.y + points[6];
 
-	//taken from: https://observablehq.com/@jrus/svg-elliptical-arcs
-	//funktioniert noch nicht ganz :(
-	const double
-		c = std::cos(phi),
-		s = std::sin(phi),
-		a = 2.0 * rx,
-		b = 2.0 * ry,
-		ab_inv = 1 / (a * b),
-		qx = (c * c) * (b * b) + (s * s) * (a * a),
-		qy = (s * s) * (b * b) + (c * c) * (a * a),
-		qxy = c * s * (b - a) * (b + a),
-		v2 = (ab_inv * ab_inv) * (qx * x2 * x2 + qy * y2 * y2 + 2 * qxy * x2 * y2),
-		Jvx = ab_inv * (qxy * x2 + qy * y2),
-		Jvy = -ab_inv * (qx * x2 + qxy * y2),
-		rc_sign = 1.0 - 2.0 * (large_arc_flag),
-		rs_sign = -1.0 + 2.0 * (sweep_flag);
-	double rc = 0.0, rs = rs_sign;
-	if (v2 < 1.0) {
-		rc = rc_sign * std::sqrt(1.0 - v2);
-		rs = rs_sign * std::sqrt(v2);
+	const double x1 = current_point.x;	//names as in reference
+	const double y1 = current_point.y;
+
+	//the following is taken from here: https://www.w3.org/TR/SVG11/implnote.html#ArcImplementationNotes
+	//the code assumes to have valid data and will not check if the arc is to small.
+
+	//going from  x1 y1 x2 y2 fA fS rx ry phi  to  cx cy theta1 delta theta: (described a little down on that side)
+
+	//step 1:
+	const auto [x1_prime, y1_prime] = Matrix2X2{ std::cos(phi), std::sin(phi),
+										        -std::sin(phi), std::cos(phi) } * Vec2D{ (x1 - x2) / 2,
+																			             (y1 - y2) / 2 };
+	//error correction for to small radii:
+	const double lambda = (x1_prime * x1_prime) / (rx * rx) + (y1_prime * y1_prime) / (ry * ry);
+	if (lambda > 1.0) {
+		rx *= std::sqrt(lambda);
+		ry *= std::sqrt(lambda);
 	}
-	const double rc_m1 = 1.0 - rc;
-	for (double t = 0.03125; t <= 1.0; t += 0.03125) {
-		const double
-			p1 = (rc_m1 * t + rc) * t,
-			p2 = (rs - rs * t) * t,
-			p3_inv = 1.0 / ((rc_m1 * t - rc_m1) * 2.0 * t + 1.0),
-			wc = p1 * p3_inv,
-			ws = p2 * p3_inv;
-		save_draw_to(transform_matrix * (current_point + Vec2D{ x2 * wc + Jvx * ws, y2 * wc + Jvy * ws }));
+
+	//step 2:
+	const double rx2 = rx * rx;						//the 2s stand for squared
+	const double ry2 = ry * ry;
+	const double x1_prime2 = x1_prime * x1_prime;
+	const double y1_prime2 = y1_prime * y1_prime;
+	const double sign = large_arc_flag != sweep_flag ? 1.0 : -1.0;
+	const Vec2D center_prime = sign * std::sqrt((rx2 * ry2 - rx2 * y1_prime2 - ry2 * x1_prime2) /
+		                                               (rx2 * y1_prime2 + ry2 * x1_prime2))         * Vec2D{ rx * y1_prime / ry,
+	                                                                                                        -ry * x1_prime / rx };
+	//step 3:
+	const Vec2D center = Matrix2X2{ std::cos(phi), -std::sin(phi),
+									std::sin(phi),  std::cos(phi) } * center_prime + Vec2D{ (x1 + x2) / 2,
+																						    (y1 + y2) / 2 };
+	//step 4:	
+	const Vec2D center_to_start_prime = Vec2D{ (x1_prime - center_prime.x) / rx, 
+	                                           (y1_prime - center_prime.y) / ry };
+	const Vec2D center_to_end_prime = Vec2D{ (-x1_prime - center_prime.x) / rx, 
+	                                         (-y1_prime - center_prime.y) / ry };
+	const double start_angle = angle({ 1, 0 }, center_to_start_prime);			//called theta 1 by w3
+	double delta_angle = angle(center_to_start_prime, center_to_end_prime);		//called delta theta by w3
+	if (sweep_flag) {
+		if (delta_angle < 0) {
+			delta_angle += 2 * pi;
+		}
 	}
+	else {
+		if (delta_angle > 0) {
+			delta_angle -= 2 * pi;
+		}
+	}
+
+	const Transform_Matrix from_arc_coordinates = transform_matrix * rotate(phi, center);
+
+	draw::arc(from_arc_coordinates, center, rx, ry, start_angle, delta_angle);
 
 	return { x2, y2 };
 }
@@ -912,15 +912,18 @@ void draw::rect(Transform_Matrix transform_matrix, std::string_view parameters, 
 		//              (4)--(5)--(6)		
 		//with X beeing center_upper_right and center_lower_left
 
+		//note: as the y-values become bigger, as one goes down, we have a negative rotation when drawing the rectangle as we do.
+		//also: the command (2) and (6) have starting angles one would intuitively change the sign of because of the y-axis direction
+
 		save_go_to(transform_matrix * Vec2D{ right_x, upper_y - ry });			                                             //start
 		linear_bezier(transform_matrix * Vec2D{ right_x, upper_y - ry }, transform_matrix * Vec2D{ left_x, upper_y - ry });	 //(1)
-		arc(transform_matrix, { left_x, upper_y }, rx, ry, pi / 2, pi, Rotation::positive);                                  //(2)
+		arc(transform_matrix, { left_x, upper_y }, rx, ry, -pi / 2, -pi / 2);                                                //(2)
 		linear_bezier(transform_matrix * Vec2D{ left_x - rx, upper_y }, transform_matrix * Vec2D{ left_x - rx, lower_y });	 //(3)
-		arc(transform_matrix, { left_x, lower_y }, rx, ry, pi, -pi / 2, Rotation::positive);	                             //(4)
+		arc(transform_matrix, { left_x, lower_y }, rx, ry, pi, -pi / 2);	                                                 //(4)
 		linear_bezier(transform_matrix * Vec2D{ left_x, lower_y + ry }, transform_matrix * Vec2D{ right_x, lower_y + ry });	 //(5)
-		arc(transform_matrix, { right_x, lower_y }, rx, ry, -pi / 2, 0, Rotation::positive);	                             //(6)
+		arc(transform_matrix, { right_x, lower_y }, rx, ry, pi / 2, -pi / 2);	                                             //(6)
 		linear_bezier(transform_matrix * Vec2D{ right_x + rx, lower_y }, transform_matrix * Vec2D{ right_x + rx, upper_y }); //(7)
-		arc(transform_matrix, { right_x, upper_y }, rx, ry, 0, pi / 2, Rotation::positive);                                  //(8)
+		arc(transform_matrix, { right_x, upper_y }, rx, ry, 0, -pi / 2);                                                     //(8)
 	}
 }
 
@@ -1082,18 +1085,13 @@ void draw::path(Transform_Matrix transform_matrix, std::string_view parameters, 
 	}
 }
 
-void draw::arc(const Transform_Matrix& transform_matrix, Vec2D center, double rx, double ry, double start_angle, double end_angle, Rotation rotation, std::size_t resolution)
+void draw::arc(const Transform_Matrix& transform_matrix, Vec2D center, double rx, double ry, double start_angle, double delta_angle, std::size_t resolution)
 {
-	if ((rotation == Rotation::positive) == (start_angle > end_angle)) {
-		end_angle += 2 * pi;
-	}
-	const double angle_per_step = rotation == Rotation::positive ? 
-		(end_angle - start_angle) / resolution : 
-		(2.0 * pi - (end_angle - start_angle)) / resolution;
+	const double angle_per_step = delta_angle / resolution;
 
 	for (std::size_t step = 1; step <= resolution; step++) {
 		const double angle = start_angle + angle_per_step * step;
-		save_draw_to(transform_matrix * Vec2D{ center.x + std::cos(angle) * rx, center.y - std::sin(angle) * ry });
+		save_draw_to(transform_matrix * Vec2D{ center.x + std::cos(angle) * rx, center.y + std::sin(angle) * ry });
 	}
 }
 

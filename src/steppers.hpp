@@ -19,6 +19,15 @@ Vec2D operator-(Vec2D a);
 Vec2D operator*(double factor, Vec2D vec);
 bool operator==(Vec2D a, Vec2D b);
 
+//returns dot-product of u and v
+double dot(Vec2D u, Vec2D v);
+
+//returns 2-Norm of vec
+double abs(Vec2D vec);
+
+//signed angle between u and v
+double angle(Vec2D u, Vec2D v);
+
 std::ostream& operator<<(std::ostream& stream, const Vec2D& coord);
 
 //used to simplify some Vector equations

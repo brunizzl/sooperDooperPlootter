@@ -1,5 +1,6 @@
-#include "steppers.hpp"
+#include <cmath>
 
+#include "steppers.hpp"
 #include "svgHandling.hpp"
 
 const Vec2D Vec2D::no_value = { std::numeric_limits<double>::max(), std::numeric_limits<double>::max() };
@@ -27,6 +28,22 @@ Vec2D operator*(double factor, Vec2D vec)
 bool operator==(Vec2D a, Vec2D b)
 {
 	return (a.x == b.x && a.y == b.y);
+}
+
+double dot(Vec2D u, Vec2D v)
+{
+	return u.x * v.x + u.y * v.y;
+}
+
+double abs(Vec2D vec)
+{
+	return std::sqrt(vec.x * vec.x + vec.y * vec.y);
+}
+
+double angle(Vec2D u, Vec2D v)
+{
+	const double sign = u.x * v.y - u.y - v.x >= 0.0 ? 1.0 : -1.0;
+	return sign * std::acos(dot(u, v) / (abs(u) * abs(v)));
 }
 
 std::ostream& operator<<(std::ostream& stream, Vec2D& coord)

@@ -275,18 +275,11 @@ namespace draw {
 
 	//the following functions are called mostly from path()
 
-	enum class Rotation
-	{
-		positive,	//mathematical positive == counterclockwise
-		negative,	//mathematical negative == clockwise
-	};
-
-	//arc is part of ellipse between start_angle and end_angle
-	//if mathematical_positive is true, the arc from start to end turning counterclockwise is drawn, clockwise if false
+	//arc is part of ellipse between start_angle and start_angle + delta_angle
 	//angles are expected to be in rad
 	//note: a rotated ellipse can not be described as an unrotated one, hence we need to drag the rotation matrix into this function.
 	void arc(const Transform_Matrix& transform_matrix, Vec2D center, double rx, double ry, double start_angle,
-		double end_angle, Rotation rotation, std::size_t resolution = default_res);
+		double delta_angle, std::size_t resolution = default_res);
 
 	void linear_bezier(Board_Vec start, Board_Vec end, std::size_t resolution = default_res);
 	void quadr_bezier(Board_Vec start, Board_Vec control, Board_Vec end, std::size_t resolution = default_res);
