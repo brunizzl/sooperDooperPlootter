@@ -54,10 +54,10 @@ RGB HSV::to_rgb()
 
 
 BMP::BMP(uint16_t width_, uint16_t height_, RGB backround)
-	:width(width_), height(height_), picture(new uint32_t[width_ * height_])
+	:width(width_), height(height_), picture(new uint32_t[(width_ + 1) * (height_ + 1)])
 {
-	for (uint16_t x = 0; x < width_; x++) {
-		for (uint16_t y = 0; y < height_; y++) {
+	for (uint16_t x = 0; x <= width_; x++) {
+		for (uint16_t y = 0; y <= height_; y++) {
 			this->set_pixel(x, y, backround);
 		}
 	}
@@ -70,13 +70,13 @@ BMP::~BMP()
 
 void BMP::set_pixel(uint16_t x, uint16_t y, RGB color)
 {
-	assert(x < width && y < height);
+	assert(x <= width && y <= height);
 	picture[y * width + x] = color.to_int();
 }
 
 void BMP::set_pixel(uint16_t x, uint16_t y, HSV color)
 {
-	assert(x < width && y < height);
+	assert(x <= width && y <= height);
 	picture[y * width + x] = color.to_rgb().to_int();
 }
 
@@ -88,10 +88,9 @@ void BMP::save_as(const char* name)
 void test::svg_to_bmp(const char * input_name, const char* output_name, double board_width, double board_height)
 {
 	//reading in file
-	std::cout << "\nreading in " << input_name << " ...\n";
+	std::cout << "\nreading in " << input_name << " ..." << std::endl;
 	std::string str = read::string_from_file(input_name);
 	preprocess_str(str);
-	//std::cout << str << "\n\n";
 
 	//finding out how often draw_to is called
 	unsigned int amount_points = 0;
@@ -147,10 +146,10 @@ void test::svg_to_bmp(const char * input_name, const char* output_name, double b
 	};
 
 
-	std::cout << "draw picture...\n";
+	std::cout << "draw picture..." << std::endl;
 	set_output_functions(draw_to, go_to);
 	read::evaluate_svg({ str.c_str(), str.length() }, board_width, board_height);
 
-	std::cout << "save picture as " << output_name << " ...\n";
+	std::cout << "save picture as " << output_name << " ..." << std::endl;
 	picture.save_as(output_name);
 }

@@ -8,8 +8,6 @@
 
 #include "steppers.hpp"
 
-constexpr double pi = 3.1415926535897932384626433832795028841971;
-
 
 // "main" function
 //reads svg at file path "name" and moves plotter accordingly
@@ -263,7 +261,7 @@ namespace path {
 //resolution in draw() determines in how many straight lines the shape is split
 //transform in draw() is matrix needed to transform from current coordinate system to board system
 namespace draw {
-	constexpr std::size_t default_res = 20;
+	constexpr std::size_t default_res = 2;
 
 	void line     (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
 	void rect     (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);

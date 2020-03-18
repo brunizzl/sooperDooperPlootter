@@ -42,8 +42,14 @@ double abs(Vec2D vec)
 
 double angle(Vec2D u, Vec2D v)
 {
-	const double sign = u.x * v.y - u.y - v.x >= 0.0 ? 1.0 : -1.0;
-	return sign * std::acos(dot(u, v) / (abs(u) * abs(v)));
+	const double unsigned_angle = std::acos(dot(u, v) / (abs(u) * abs(v)));
+	if (std::isnan(unsigned_angle)) {
+		return pi;
+	}
+	else {
+		const double sign = u.x * v.y - u.y - v.x >= 0.0 ? 1.0 : -1.0;
+		return sign * unsigned_angle;
+	}
 }
 
 std::ostream& operator<<(std::ostream& stream, Vec2D& coord)

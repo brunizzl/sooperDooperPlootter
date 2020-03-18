@@ -771,71 +771,76 @@ Bezier_Data path::take_next_bezier(std::string_view& view)
 Vec2D path::process_arc(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point)
 {
 	const std::vector<double> points = from_csv(data.content);	//data would be a better name than points, but this name is already taken.
-	assert(points.size() == 7);
+	assert(points.size() % 7 == 0);
 
-	double rx = std::abs(points[0]);		//needs to be able to be updated if to small
-	double ry = std::abs(points[1]);		//needs to be able to be updated if to small
-	const double phi = to_rad(std::fmod(points[2], 360.0));		//often called x_axis_rotation
-	const bool large_arc_flag = static_cast<bool>(points[3]);	//w3 says any nonzero value is meant as true
-	const bool sweep_flag = static_cast<bool>(points[4]);
-	const double x2 = data.coords_type == Coords_Type::absolute ? points[5] : current_point.x + points[5];
-	const double y2 = data.coords_type == Coords_Type::absolute ? points[6] : current_point.y + points[6];
+	for (std::size_t i = 0; i < points.size(); i += 7) {
+		double rx = std::abs(points[i]);			//needs to be able to be updated if to small
+		double ry = std::abs(points[i + 1]);		//needs to be able to be updated if to small
+		const double phi = to_rad(std::fmod(points[i + 2], 360.0));		//often called x_axis_rotation
+		const bool large_arc_flag = points[i + 3];	//w3 says any nonzero value is meant as true
+		const bool sweep_flag = points[i + 4];
+		const double x2 = data.coords_type == Coords_Type::absolute ? points[i + 5] : current_point.x + points[i + 5];
+		const double y2 = data.coords_type == Coords_Type::absolute ? points[i + 6] : current_point.y + points[i + 6];
 
-	const double x1 = current_point.x;	//names as in reference
-	const double y1 = current_point.y;
+		const double x1 = current_point.x;	//names as in reference
+		const double y1 = current_point.y;
 
-	//the following is taken from here: https://www.w3.org/TR/SVG11/implnote.html#ArcImplementationNotes
-	//the code assumes to have valid data and will not check if the arc is to small.
+		//the following is taken from here: https://www.w3.org/TR/SVG11/implnote.html#ArcImplementationNotes
+		//the code assumes to have valid data and will not check if the arc is to small.
 
-	//going from  x1 y1 x2 y2 fA fS rx ry phi  to  cx cy theta1 delta theta: (described a little down on that side)
+		//going from  x1 y1 x2 y2 fA fS rx ry phi  to  cx cy theta1 delta theta: (described a little down on that side)
 
-	//step 1:
-	const auto [x1_prime, y1_prime] = Matrix2X2{ std::cos(phi), std::sin(phi),
-										        -std::sin(phi), std::cos(phi) } * Vec2D{ (x1 - x2) / 2,
-																			             (y1 - y2) / 2 };
-	//error correction for to small radii:
-	const double lambda = (x1_prime * x1_prime) / (rx * rx) + (y1_prime * y1_prime) / (ry * ry);
-	if (lambda > 1.0) {
-		rx *= std::sqrt(lambda);
-		ry *= std::sqrt(lambda);
-	}
-
-	//step 2:
-	const double rx2 = rx * rx;						//the 2s stand for squared
-	const double ry2 = ry * ry;
-	const double x1_prime2 = x1_prime * x1_prime;
-	const double y1_prime2 = y1_prime * y1_prime;
-	const double sign = large_arc_flag != sweep_flag ? 1.0 : -1.0;
-	const Vec2D center_prime = sign * std::sqrt((rx2 * ry2 - rx2 * y1_prime2 - ry2 * x1_prime2) /
-		                                               (rx2 * y1_prime2 + ry2 * x1_prime2))         * Vec2D{ rx * y1_prime / ry,
-	                                                                                                        -ry * x1_prime / rx };
-	//step 3:
-	const Vec2D center = Matrix2X2{ std::cos(phi), -std::sin(phi),
-									std::sin(phi),  std::cos(phi) } * center_prime + Vec2D{ (x1 + x2) / 2,
-																						    (y1 + y2) / 2 };
-	//step 4:	
-	const Vec2D center_to_start_prime = Vec2D{ (x1_prime - center_prime.x) / rx, 
-	                                           (y1_prime - center_prime.y) / ry };
-	const Vec2D center_to_end_prime = Vec2D{ (-x1_prime - center_prime.x) / rx, 
-	                                         (-y1_prime - center_prime.y) / ry };
-	const double start_angle = angle({ 1, 0 }, center_to_start_prime);			//called theta 1 by w3
-	double delta_angle = angle(center_to_start_prime, center_to_end_prime);		//called delta theta by w3
-	if (sweep_flag) {
-		if (delta_angle < 0) {
-			delta_angle += 2 * pi;
+		//step 1:
+		const auto [x1_prime, y1_prime] = Matrix2X2{ std::cos(phi), std::sin(phi),
+													-std::sin(phi), std::cos(phi) } *Vec2D{ (x1 - x2) / 2,
+																							 (y1 - y2) / 2 };
+		//error correction for to small radii:
+		const double lambda = (x1_prime * x1_prime) / (rx * rx) + (y1_prime * y1_prime) / (ry * ry);
+		if (lambda > 1.0) {
+			rx *= std::sqrt(lambda);
+			ry *= std::sqrt(lambda);
 		}
-	}
-	else {
-		if (delta_angle > 0) {
-			delta_angle -= 2 * pi;
+
+		//step 2:
+		const double rx2 = rx * rx;						//the 2s stand for squared
+		const double ry2 = ry * ry;
+		const double x1_prime2 = x1_prime * x1_prime;
+		const double y1_prime2 = y1_prime * y1_prime;
+		const double sign = large_arc_flag != sweep_flag ? 1.0 : -1.0;
+		const Vec2D center_prime = sign * std::sqrt(std::abs((rx2 * ry2 - rx2 * y1_prime2 - ry2 * x1_prime2) / 	//in an ideal world abs() is not needed, but negative values can arise from rounding errors.
+			(rx2 * y1_prime2 + ry2 * x1_prime2))) * Vec2D
+		{
+			rx* y1_prime / ry,
+				-ry * x1_prime / rx
+		};
+		//step 3:
+		const Vec2D center = Matrix2X2{ std::cos(phi), -std::sin(phi),
+										std::sin(phi),  std::cos(phi) } *center_prime + Vec2D{ (x1 + x2) / 2,
+																								(y1 + y2) / 2 };
+		//step 4:	
+		const Vec2D v1 = Vec2D{ (x1_prime - center_prime.x) / rx,
+								(y1_prime - center_prime.y) / ry };
+		const Vec2D v2 = Vec2D{ (-x1_prime - center_prime.x) / rx,
+								(-y1_prime - center_prime.y) / ry };
+		const double start_angle = angle({ 1, 0 }, v1);			//called theta 1 by w3
+		double delta_angle = angle(v1, v2);		                //called delta theta by w3
+		if (sweep_flag) {
+			if (delta_angle < 0) {
+				delta_angle += 2 * pi;
+			}
 		}
+		else {
+			if (delta_angle > 0) {
+				delta_angle -= 2 * pi;
+			}
+		}
+
+		const Transform_Matrix from_arc_coordinates = transform_matrix * rotate(phi, center);
+		draw::arc(from_arc_coordinates, center, rx, ry, start_angle, delta_angle);
+		current_point = { x2, y2 };
 	}
 
-	const Transform_Matrix from_arc_coordinates = transform_matrix * rotate(phi, center);
-
-	draw::arc(from_arc_coordinates, center, rx, ry, start_angle, delta_angle);
-
-	return { x2, y2 };
+	return current_point;
 }
 
 
