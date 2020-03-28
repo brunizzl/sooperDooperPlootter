@@ -2,6 +2,8 @@
 #include <cassert>
 #include <cmath>
 #include <functional>
+#include <iostream>
+#include <fstream>
 
 #include "test.hpp"
 #include "steppers.hpp"
@@ -152,4 +154,31 @@ void test::svg_to_bmp(const char * input_name, const char* output_name, double b
 
 	std::cout << "save picture as " << output_name << " ..." << std::endl;
 	picture.save_as(output_name);
+}
+
+void test::svg_to_bbf(const char* input_name, const char* output_name, double board_width, double board_height)
+{
+	//reading in file
+	std::cout << "\nreading in " << input_name << " ..." << std::endl;
+	std::string str = read::string_from_file(input_name);
+	preprocess_str(str);
+	
+	//opening new bbf file
+	std::ofstream output;
+	output.open(output_name);
+
+
+	std::function go_to = [&](Board_Vec point) {
+		output << "0 " << point.x << " " << point.y << "\n";
+	};
+	std::function draw_to = [&](Board_Vec point) {
+		output << "1 " << point.x << " " << point.y << "\n";
+	};
+
+	std::cout << "draw picture..." << std::endl;
+	set_output_functions(draw_to, go_to);
+	read::evaluate_svg({ str.c_str(), str.length() }, board_width, board_height);
+
+	std::cout << "save picture as " << output_name << " ..." << std::endl;
+	output.close();
 }

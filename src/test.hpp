@@ -41,5 +41,5 @@ public:
 namespace test {
 
 	void svg_to_bmp(const char * input_name, const char* output_name, double board_width, double board_height);
-	
+	void svg_to_bbf(const char* input_name, const char* output_name, double board_width, double board_height);
 }

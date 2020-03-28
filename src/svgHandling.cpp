@@ -261,6 +261,39 @@ Transform_Matrix View_Box::set(std::string_view data, double board_width, double
 	}
 }
 
+Transform_Matrix View_Box::set(double width, double height, double board_width, double board_height)
+{
+	const double min_x = 0;
+	const double min_y = 0;
+
+	if (width / height < board_width / board_height) {	//view box has taller aspect ratio than board -> leaving space on right and left side of board
+		const double scaling_factor = board_height / height;	//y-direction limits size
+		const double view_width_in_board_units = width * scaling_factor;	//width of view box given in board coordinates
+		const double x_offset = (board_width - view_width_in_board_units) / 2;	//x-coordinate of left boundary of view box given in board coordinates
+
+		View_Box::min.x = x_offset;
+		View_Box::max.x = x_offset + view_width_in_board_units;
+		View_Box::min.y = 0;
+		View_Box::max.y = board_height;
+
+		//     shift to middle of board     scaling to board units                  translate in svg units to (0, 0)
+		return translate({ x_offset, 0 }) * scale(scaling_factor, scaling_factor) * translate({ -min_x, -min_y });
+	}
+	else {	//view box is wider than board -> full use of board_width, but only use lower part of board
+		const double scaling_factor = board_width / width;
+		const double view_height_in_board_units = height * scaling_factor;
+		const double y_offset = board_height - view_height_in_board_units;
+
+		View_Box::min.x = 0;
+		View_Box::max.x = board_width;
+		View_Box::min.y = y_offset;
+		View_Box::max.y = y_offset + view_height_in_board_units;
+
+		//     shift to middle of board     scaling to board units                  translate in svg units to (0, 0)
+		return translate({ 0, y_offset }) * scale(scaling_factor, scaling_factor) * translate({ -min_x, -min_y });
+	}
+}
+
 bool View_Box::contains(Board_Vec point)
 {
 	return point.x > View_Box::min.x && point.x < View_Box::max.x 
@@ -353,14 +386,14 @@ std::string_view read::get_attribute_data(std::string_view search_zone, std::str
 	return { "" };
 }
 
-std::vector<double> read::from_csv(std::string_view csv)
+std::vector<double> read::from_csv(std::string_view csv, bool always_comma)
 {
 	std::vector<double> result;
 	result.reserve(std::count_if(csv.begin(), csv.end(), [](char c) { return c == ' ' || c == ','; }) + 1);
 
 	std::size_t next_value_start = csv.find_first_of("0123456789.+-");
 	while (next_value_start != std::string::npos) {
-		const std::size_t next_seperator = csv.find_first_of(", -", next_value_start + 1);	//minus may also be used as seperator
+		const std::size_t next_seperator = csv.find_first_of((always_comma? "," : ", -"), next_value_start + 1);	//minus may also be used as seperator
 		const std::string_view next_value = in_between(csv, next_value_start - 1, next_seperator);
 		result.push_back(to_scaled(next_value));
 		next_value_start = csv.find_first_of("0123456789.+-", next_seperator);
@@ -446,8 +479,17 @@ std::string read::string_from_file(const char* file_name)
 
 void read::evaluate_svg(std::string_view svg_view, double board_width, double board_height)
 {
+	Transform_Matrix to_board = in_matrix_order(1, 0, 0,
+	                                            0, 1, 0);
 	const std::string_view view_box_data = read::get_attribute_data(svg_view, "viewBox=");
-	Transform_Matrix to_board = View_Box::set(view_box_data, board_width, board_height);
+	if (view_box_data != "") {
+		to_board = View_Box::set(view_box_data, board_width, board_height);
+	}
+	else {
+		const double width = read::to_scaled(read::get_attribute_data(svg_view, "width="));
+		const double height = read::to_scaled(read::get_attribute_data(svg_view, "height="));
+		to_board = View_Box::set(width, height, board_width, board_height);
+	}
 
 	read::evaluate_fragment(svg_view, to_board);
 }
@@ -489,10 +531,10 @@ void read::evaluate_fragment(std::string_view fragment, const Transform_Matrix& 
 
 		case Elem_Type::line:		draw::line(transform, next.content);		break;
 		case Elem_Type::polyline:	draw::polyline(transform, next.content);	break;
-		case Elem_Type::polygon:	draw::polygon(transform, next.content);	break;
+		case Elem_Type::polygon:	draw::polygon(transform, next.content);		break;
 		case Elem_Type::rect:		draw::rect(transform, next.content);		break;
-		case Elem_Type::ellipse:	draw::ellipse(transform, next.content);	break;
-		case Elem_Type::circle:		draw::circle(transform, next.content);	break;
+		case Elem_Type::ellipse:	draw::ellipse(transform, next.content);		break;
+		case Elem_Type::circle:		draw::circle(transform, next.content);		break;
 		case Elem_Type::path:		draw::path(transform, next.content);		break;
 		}
 
@@ -516,7 +558,7 @@ Transform_Matrix read::get_transform_matrix(std::string_view group_attributes)
 				const std::size_t closing_parenthesis = transform_list.find_first_of(')');
 				//name does not include parentheses, but the length is one bigger than the biggest index in name. hence name.length() returns the right number
 				const std::string_view parameter_view = in_between(transform_list, name.length(), closing_parenthesis); 
-				const std::vector<double> parameters = from_csv(parameter_view);
+				const std::vector<double> parameters = from_csv(parameter_view, true);
 
 				switch (transform) {
 				case Transform::matrix:
@@ -664,7 +706,7 @@ Vec2D path::process_quadr_bezier(const Transform_Matrix& transform_matrix, Path_
 			}
 
 			for (std::size_t i = 0; i < points.size(); i += 2) {
-				const Vec2D control = calculate_contol_point(last_control_point, current_point);
+				const Vec2D control = compute_contol_point(last_control_point, current_point);
 
 				const Vec2D end = curve.coords_type == Coords_Type::absolute ?
 					Vec2D{ points[i], points[i + 1] } :
@@ -716,7 +758,7 @@ Vec2D path::process_cubic_bezier(const Transform_Matrix& transform_matrix, Path_
 			}
 
 			for (std::size_t i = 0; i < points.size(); i += 4) {
-				const Vec2D control_1 = calculate_contol_point(last_control_point, current_point);
+				const Vec2D control_1 = compute_contol_point(last_control_point, current_point);
 
 				const Vec2D control_2 = curve.coords_type == Coords_Type::absolute ?
 					Vec2D{ points[i], points[i + 1] } :
@@ -737,7 +779,7 @@ Vec2D path::process_cubic_bezier(const Transform_Matrix& transform_matrix, Path_
 	return current_point;
 }
 
-Vec2D path::calculate_contol_point(Vec2D last_control_point, Vec2D mirror)
+Vec2D path::compute_contol_point(Vec2D last_control_point, Vec2D mirror)
 {
 	return 2.0 * mirror - last_control_point;
 }

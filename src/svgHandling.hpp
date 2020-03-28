@@ -75,6 +75,7 @@ public:
 	//sets view box to have aspect ratio as described in data, but stored in Board units (mm)
 	//the transformation matrix from the outhermost svg coordinate system to the board is returned
 	static Transform_Matrix set(std::string_view data, double board_width, double board_height);
+	static Transform_Matrix set(double width, double height, double board_width, double board_height);
 
 	//checks if point is contained within view box
 	static bool contains(Board_Vec point);
@@ -140,7 +141,8 @@ namespace read {
 
 	//multiple commas/ spaces and combinations thereof are read in as a single seperator.
 	//example: from_csv("-1, 30 4  6.35,9") yields { -1.0, 30.0, 4.0, 6.35. 9.0 }
-	std::vector<double> from_csv(std::string_view csv);
+	//if always_comma is set, csv will not seperate at space or '-', but only at ','.
+	std::vector<double> from_csv(std::string_view csv, bool always_comma = false);
 
 	//units as specified by w3: https://www.w3.org/TR/SVG11/coords.html#Units
 	enum class Unit
@@ -231,7 +233,10 @@ namespace path {
 		impl,
 	};
 
-	Vec2D calculate_contol_point(Vec2D last_control_point, Vec2D mirror);
+	//if a control point is only given implicitly, it lies on a line with the last control point and the current point.
+	//the distance to the current point is equal to the distance of the last control point and the current point, 
+	//only the direction is opposite.
+	Vec2D compute_contol_point(Vec2D last_control_point, Vec2D mirror);
 
 	struct Bezier_Data
 	{
@@ -261,7 +266,7 @@ namespace path {
 //resolution in draw() determines in how many straight lines the shape is split
 //transform in draw() is matrix needed to transform from current coordinate system to board system
 namespace draw {
-	constexpr std::size_t default_res = 20;
+	constexpr std::size_t default_res = 40;
 
 	void line     (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
 	void rect     (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
