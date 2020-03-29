@@ -46,5 +46,6 @@ namespace test {
 		uint16_t mesh_size, double scaling_factor = 1);
 	void svg_to_bbf(const std::string& svg_str, const char* output_name, double board_width, double board_height);
 
+	//this function expects a specific folder structure
 	void read_string_to_bmp_and_bbf(const char* input_name, double board_width, double board_height);
 }

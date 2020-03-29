@@ -6,7 +6,7 @@
 #include <string>
 #include <string_view>
 
-#include "steppers.hpp"
+#include "linearAlgebra.hpp"
 
 
 // "main" function
@@ -19,69 +19,27 @@ void draw_from_file(const char* name, double board_width, double board_height);
 //and inserts spaces in front of '-', as spaces are used to seperate numbers
 void preprocess_str(std::string& str);
 
-
-
-struct Transform_Matrix
-{
-	double a, b, c, d, e, f;
-	//corresponds to Matrix
-	// a c e
-	// b d f
-	// 0 0 1
-	//as specified here: https://www.w3.org/TR/SVG11/coords.html#TransformMatrixDefined
-};
-
-//matrix * matrix, as in math
-Transform_Matrix operator*(const Transform_Matrix& fst, const Transform_Matrix& snd);
-
-//matrix * vector, as in math. the third coordinate of vec is always 1.
-Board_Vec operator*(const Transform_Matrix& matrix, Vec2D vec);
-
-//create matrices from different transformations
-//these are also all taken from here: https://www.w3.org/TR/SVG11/coords.html#TransformMatrixDefined
-Transform_Matrix translate(Vec2D t);
-Transform_Matrix scale(double sx, double sy);
-Transform_Matrix rotate(double angle);	//angle in rad
-Transform_Matrix rotate(double angle, Vec2D pivot);	//angle in rad (but stored in svg as degree)
-Transform_Matrix skew_x(double angle);
-Transform_Matrix skew_y(double angle);
-
-enum class Transform
-{
-	matrix,
-	translate,
-	scale,
-	rotate,
-	skew_x,
-	skew_y,
-};
-
-std::string_view name_of(Transform transform);
-
-static const Transform all_transforms[] = { Transform::matrix, Transform::translate, Transform::scale,
-	Transform::rotate, Transform::skew_x, Transform::skew_y, };
-
 //the svg standard allows for view boxes to be defined inside other view boxes.
 //this forces an implementation of the complete standard to check every coordinate transformation, if we are still within the view box.
 //this removes the possibility of expressing a combination of transformations as matrix multiplication. 
 //i therefore only track the outhermost view box.
 class View_Box
 {
-	static Board_Vec min;	//upper left corner of box
-	static Board_Vec max;	//lower right corner of box
+	static la::Board_Vec min;	//upper left corner of box
+	static la::Board_Vec max;	//lower right corner of box
 
 	//called by public set functions
-	static Transform_Matrix private_set(double min_x, double min_y, double width, double height, double board_width, double board_height);
+	static la::Transform_Matrix private_set(double min_x, double min_y, double width, double height, double board_width, double board_height);
 
 public:
 
 	//sets view box to have aspect ratio as described in data, but stored in Board units (mm)
 	//the transformation matrix from the outhermost svg coordinate system to the board is returned
-	static Transform_Matrix set(std::string_view data, double board_width, double board_height);
-	static Transform_Matrix set(double width, double height, double board_width, double board_height);
+	static la::Transform_Matrix set(std::string_view data, double board_width, double board_height);
+	static la::Transform_Matrix set(double width, double height, double board_width, double board_height);
 
 	//checks if point is contained within view box
-	static bool contains(Board_Vec point);
+	static bool contains(la::Board_Vec point);
 };
 
 
@@ -175,10 +133,10 @@ namespace read {
 	void evaluate_svg(std::string_view svg_view, double board_width, double board_height);
 
 	//reads all of fragment
-	void evaluate_fragment(std::string_view fragment, const Transform_Matrix& transform);
+	void evaluate_fragment(std::string_view fragment, const la::Transform_Matrix& transform);
 
 	//returns matrix resulting from transformation attributes of group specified in group attributes
-	Transform_Matrix get_transform_matrix(std::string_view group_attributes);
+	la::Transform_Matrix get_transform_matrix(std::string_view group_attributes);
 }
 
 
@@ -224,8 +182,8 @@ namespace path {
 	//do the drawing of as much bezier curves as data can deliver
 	//current_point is current position of plotter
 	//return where they finnished drawing (the new current_point).
-	Vec2D process_quadr_bezier(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point);
-	Vec2D process_cubic_bezier(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point);
+	la::Vec2D process_quadr_bezier(const la::Transform_Matrix& transform_matrix, Path_Elem_data data, la::Vec2D current_point);
+	la::Vec2D process_cubic_bezier(const la::Transform_Matrix& transform_matrix, Path_Elem_data data, la::Vec2D current_point);
 
 	//control point is given explicitly -> set to expl
 	//control point is to be calculated from the last control point -> set to impl
@@ -239,7 +197,7 @@ namespace path {
 	//if a control point is only given implicitly, it lies on a line with the last control point and the current point.
 	//the distance to the current point is equal to the distance of the last control point and the current point, 
 	//only the direction is opposite.
-	Vec2D compute_contol_point(Vec2D last_control_point, Vec2D mirror);
+	la::Vec2D compute_contol_point(la::Vec2D last_control_point, la::Vec2D mirror);
 
 	struct Bezier_Data
 	{
@@ -260,7 +218,7 @@ namespace path {
 
 	//analogous to process_bezier() functions
 	//see here how to calculate: https://www.w3.org/TR/SVG11/paths.html#PathDataEllipticalArcCommands
-	Vec2D process_arc(const Transform_Matrix& transform_matrix, Path_Elem_data data, Vec2D current_point);
+	la::Vec2D process_arc(const la::Transform_Matrix& transform_matrix, Path_Elem_data data, la::Vec2D current_point);
 }
 
 
@@ -271,23 +229,23 @@ namespace path {
 namespace draw {
 	constexpr std::size_t default_res = 100;
 
-	void line     (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
-	void rect     (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
-	void circle   (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
-	void ellipse  (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
-	void polyline (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
-	void polygon  (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
-	void path     (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void line     (la::Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void rect     (la::Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void circle   (la::Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void ellipse  (la::Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void polyline (la::Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void polygon  (la::Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
+	void path     (la::Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
 
 	//the following functions are called mostly from path()
 
 	//arc is part of ellipse between start_angle and start_angle + delta_angle
 	//angles are expected to be in rad
 	//note: a rotated ellipse can not be described as an unrotated one, hence we need to drag the rotation matrix into this function.
-	void arc(const Transform_Matrix& transform_matrix, Vec2D center, double rx, double ry, double start_angle,
+	void arc(const la::Transform_Matrix& transform_matrix, la::Vec2D center, double rx, double ry, double start_angle,
 		double delta_angle, std::size_t resolution = default_res);
 
-	void linear_bezier(Board_Vec start, Board_Vec end, std::size_t resolution = default_res);
-	void quadr_bezier(Board_Vec start, Board_Vec control, Board_Vec end, std::size_t resolution = default_res);
-	void cubic_bezier(Board_Vec start, Board_Vec control_1, Board_Vec control_2, Board_Vec end, std::size_t resolution = default_res);
+	void linear_bezier(la::Board_Vec start, la::Board_Vec end, std::size_t resolution = default_res);
+	void quadr_bezier(la::Board_Vec start, la::Board_Vec control, la::Board_Vec end, std::size_t resolution = default_res);
+	void cubic_bezier(la::Board_Vec start, la::Board_Vec control_1, la::Board_Vec control_2, la::Board_Vec end, std::size_t resolution = default_res);
 }

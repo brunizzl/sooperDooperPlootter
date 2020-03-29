@@ -6,7 +6,7 @@
 #include <fstream>
 
 #include "test.hpp"
-#include "steppers.hpp"
+#include "linearAlgebra.hpp"
 #include "svgHandling.hpp"
 #include "libBMP.h"
 
@@ -29,7 +29,7 @@ RGB HSV::to_rgb()
 {
 	//formulas taken from here : https://en.wikipedia.org/wiki/HSL_and_HSV
 
-	const double angle = this->hue * 3 / pi;  //in interval [0, 5]
+	const double angle = this->hue * 3 / la::pi;  //in interval [0, 5]
 	const double chroma = this->value * this->saturation;
 	const double rest = chroma * (1.0 - std::fabs(std::fmod(angle, 2.0) - 1.0));
 
@@ -108,10 +108,10 @@ void test::svg_to_bmp(const std::string& svg_str, const char* output_name, doubl
 	//finding out how often draw_to is called
 	unsigned int amount_points = 0;
 	double distance = 0;
-	Board_Vec current_point(0, 0);
+	la::Board_Vec current_point(0, 0);
 	bool pen_down = false;
 	unsigned int times_pen_moved_down = 0;
-	std::function compute_draw_to_values = [&](Board_Vec point) {
+	std::function compute_draw_to_values = [&](la::Board_Vec point) {
 		amount_points++; 
 		distance += abs(current_point - point);
 		current_point = point;
@@ -120,7 +120,7 @@ void test::svg_to_bmp(const std::string& svg_str, const char* output_name, doubl
 		}
 		pen_down = true;
 	};
-	std::function compute_go_to_values = [&](Board_Vec point) {
+	std::function compute_go_to_values = [&](la::Board_Vec point) {
 		distance += abs(current_point - point);
 		current_point = point;
 		pen_down = false;
@@ -133,7 +133,7 @@ void test::svg_to_bmp(const std::string& svg_str, const char* output_name, doubl
 	const int time_in_seconds = distance / 4.44 + times_pen_moved_down * 1.0;
 	std::cout << "the estimated time to draw is " << time_in_seconds / 60 << " minutes and " << time_in_seconds % 60 << " seconds\n";
 
-	const double hue_per_point = 1.99 * pi / amount_points;	//just stay under 2 * pi, to not risk hue beeing slightly over 2 * pi in last point, due to rounding error
+	const double hue_per_point = 1.99 * la::pi / amount_points;	//just stay under 2 * pi, to not risk hue beeing slightly over 2 * pi in last point, due to rounding error
 	HSV hsv_color(0, 1, 1);
 
 	BMP picture(static_cast<uint16_t>(board_width * scaling_factor), static_cast<uint16_t>(board_height * scaling_factor), { 80, 80, 80 });
@@ -141,10 +141,10 @@ void test::svg_to_bmp(const std::string& svg_str, const char* output_name, doubl
 		picture.draw_mesh(mesh_size * scaling_factor, { 0, 0, 0 });
 	}
 
-	Board_Vec current(0, 0);
+	la::Board_Vec current(0, 0);
 
 
-	std::function draw_to = [&](Board_Vec point) {
+	std::function draw_to = [&](la::Board_Vec point) {
 		point = scaling_factor * point;
 		double gradient = (point.y - current.y) / (point.x - current.x);
 		const RGB random_color = { std::rand() % 255, std::rand() % 255, std::rand() % 255 }; //can be used as an alternative to point_color
@@ -179,7 +179,7 @@ void test::svg_to_bmp(const std::string& svg_str, const char* output_name, doubl
 		current = point; 
 		hsv_color.hue += hue_per_point;
 	};
-	std::function go_to = [&](Board_Vec point) {
+	std::function go_to = [&](la::Board_Vec point) {
 		point = scaling_factor * point;
 		current = point;
 	};
@@ -199,10 +199,10 @@ void test::svg_to_bbf(const std::string& svg_str, const char* output_name, doubl
 	std::ofstream output;
 	output.open(output_name);
 
-	std::function go_to = [&](Board_Vec point) {
+	std::function go_to = [&](la::Board_Vec point) {
 		output << "0 " << point.x << " " << point.y << "\n";
 	};
-	std::function draw_to = [&](Board_Vec point) {
+	std::function draw_to = [&](la::Board_Vec point) {
 		output << "1 " << point.x << " " << point.y << "\n";
 	};
 
