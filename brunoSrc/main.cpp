@@ -35,9 +35,9 @@ int real_main(int argc, char* argv[])
 	else {
 		std::cout << "Error: wrong numer of parameters.\n";
 		std::cout << "valid call options are:                                                examples:\n\n";
-		std::cout << "sooperDooperPlooter <SVG_name> <wall_width_&_height>                   sooperDooperPlooter Rick_and_Morty 350\n";
-		std::cout << "sooperDooperPlooter <SVG_name> <wall_width> <wall_height>              sooperDooperPlooter Rick_and_Morty 350 100\n";
-		std::cout << "sooperDooperPlooter <SVG_name> <wall_width> <wall_height> <mesh_size>  sooperDooperPlooter Rick_and_Morty 350 100 10\n";
+		std::cout << "sooperDooperPlooter <SVG_name> <wall_width_&_height>                   sooperDooperPlooter examplePicture 350\n";
+		std::cout << "sooperDooperPlooter <SVG_name> <wall_width> <wall_height>              sooperDooperPlooter examplePicture 350 100\n";
+		std::cout << "sooperDooperPlooter <SVG_name> <wall_width> <wall_height> <mesh_size>  sooperDooperPlooter examplePicture 350 100 10\n";
 		std::cout << "all units are to be provided in mm.\n";
 	}
 	return 0;
