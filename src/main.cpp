@@ -45,11 +45,12 @@ int real_main(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
-	//return real_main(argc, argv);
+	return real_main(argc, argv);
 	const double width = 350;
 	const double height = 350;
-	test::read_string_to_bmp_and_bbf("1", width, height);
+	//test::read_string_to_bmp_and_bbf("1", width, height);
 	//test::read_string_to_bmp_and_bbf("homer-simpson", width, height);
+	//test::read_string_to_bmp_and_bbf("bojack", width, height);
 
 	//std::cin.get();
 }

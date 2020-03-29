@@ -20,7 +20,7 @@ uint32_t RGB::to_int()
 HSV::HSV(double hue_, double saturation_, double value_)
 	:hue(hue_), saturation(saturation_), value(value_)
 {
-	assert(hue_ >= 0 && hue_ <= 2 * pi);
+	assert(hue_ >= 0 && hue_ <= 2 * la::pi);
 	assert(saturation_ >= 0 && saturation_ <= 1);
 	assert(value_ >= 0 && value_ <= 1);
 }

@@ -59,13 +59,16 @@ std::size_t find_closing_elem(std::string_view search_zone, std::string_view ope
 {
 	assert(opening_sequence != closing_sequence);
 
-	std::size_t next_open = read::find_skip_quotations(search_zone, opening_sequence);
-	std::size_t next_clsd = read::find_skip_quotations(search_zone, closing_sequence);
+	std::size_t next_open = -1;
+	std::size_t next_clsd = 0;
 
-	while (next_open < next_clsd) {
-		next_open = read::find_skip_quotations(search_zone, opening_sequence, next_open + opening_sequence.length());
+	do {
+		do {
+			next_open = read::find_skip_quotations(search_zone, opening_sequence, next_open + 1);
+		} while (next_open != std::string::npos && (search_zone[next_open + opening_sequence.length()] != ' ' && search_zone[next_open + opening_sequence.length()] != '>'));
+
 		next_clsd = read::find_skip_quotations(search_zone, closing_sequence, next_clsd + closing_sequence.length());
-	}
+	} while (next_open < next_clsd);
 	return next_clsd;
 }
 
@@ -225,27 +228,6 @@ std::string_view read::name_of(Elem_Type type)
 	return {};
 }
 
-std::string_view read::end_marker(Elem_Type type)
-{
-	switch (type) {
-	case Elem_Type::svg:			
-	case Elem_Type::g:			
-		return { ">" };
-	case Elem_Type::line:			
-	case Elem_Type::polyline:		
-	case Elem_Type::polygon:		
-	case Elem_Type::rect:			
-	case Elem_Type::ellipse:		
-	case Elem_Type::circle:			
-	case Elem_Type::path:		
-		return { "/>" };
-	case Elem_Type::unknown:	
-		return { ">" };		//just assume the less restricting marker if the type is unknown 
-	}
-	assert(false);	//if this assert is hit, you may update the switchcase above.
-	return {};
-}
-
 std::size_t read::find_skip_quotations(std::string_view search_zone, std::string_view search_obj, std::size_t start)
 {
 	std::size_t next_quotation_start = search_zone.find_first_of("\"'", start);
@@ -344,7 +326,7 @@ Elem_Data read::take_next_elem(std::string_view& view)
 		const std::string_view type_name = name_of(type);
 		if (view.compare(0, type_name.length(), type_name) == 0) {
 			view.remove_prefix(type_name.length());		//"circle cx=..." becomes " cx=..."
-			const std::size_t end = find_skip_quotations(view, end_marker(type));
+			const std::size_t end = find_skip_quotations(view, ">");
 			const std::string_view content = shorten_to(view, end);		//it is just expected that an end marker was found.
 			view.remove_prefix(end + std::strlen(">"));
 			return { type, content };
@@ -399,7 +381,7 @@ void read::evaluate_fragment(std::string_view fragment, const la::Transform_Matr
 		switch (next.type) {
 		case Elem_Type::svg:
 			{
-				const std::size_t nested_svg_end = find_closing_elem(fragment, { "<svg " }, { "</svg>" });
+				const std::size_t nested_svg_end = find_closing_elem(fragment, { "<svg" }, { "</svg>" });
 				const std::string_view nested_svg_fragment = { fragment.data(), nested_svg_end };
 
 				const double x_offset = to_scaled(get_attribute_data(next.content, { "x=" }), 0.0);
@@ -413,7 +395,7 @@ void read::evaluate_fragment(std::string_view fragment, const la::Transform_Matr
 
 		case Elem_Type::g:
 			{
-				const std::size_t group_end = find_closing_elem(fragment, { "<g " }, { "</g>" });
+				const std::size_t group_end = find_closing_elem(fragment, { "<g" }, { "</g>" });
 				const std::string_view group_fragment = { fragment.data(), group_end };
 
 				const la::Transform_Matrix group_matrix = transform * get_transform_matrix(next.content);
