@@ -5,7 +5,7 @@ This is a project for class "Betriebssysteme - eine Einführung" at Leuphana Uni
 sooperDooperPlooter is currently split into two parts. The folder brunoSrc contains a program to convert SVG graphics into very easy to parse bbf (Bashey-Bruno-Format) data, witch is a textfile with numbers seperated by whitespaces. 
 The second part is found in folder basheySrc. This second program is meant to be compiled and run on the raspberry pie of the plotting device. Here the bbf file is read in.
 
-The syntax of a bff command bff is as follows: <flag> <x-coordinate> <y-coordinate>, where <flag> is eighter '0' meaning "go to the specified coordinates" or '1' meaning "draw a straight line from the current position to the specified coordinates". A bbf file can have an abitrary ammount of commands, but is required to start with a goto.
+The syntax of a bff command bff is as follows: [flag] [x-coordinate] [y-coordinate], where [flag] is eighter '0' meaning "go to the specified coordinates" or '1' meaning "draw a straight line from the current position to the specified coordinates". A bbf file can have an abitrary ammount of commands, but is required to start with a goto.
 
 The plotter itself is not an own design, but developed by Fredrik Stridsman, his project can be found here https://github.com/snebragd/stringent. We thank Fredrik to enable our project.
 
