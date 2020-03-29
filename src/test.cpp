@@ -33,7 +33,7 @@ RGB HSV::to_rgb()
 	const double chroma = this->value * this->saturation;
 	const double rest = chroma * (1.0 - std::fabs(std::fmod(angle, 2.0) - 1.0));
 
-	double red, green, blue;
+	double red = 0, green = 0, blue = 0;
 
 	switch (static_cast<int>(angle)) {
 	case 0: red = chroma; green = rest;   blue = 0;      break;
@@ -82,44 +82,70 @@ void BMP::set_pixel(uint16_t x, uint16_t y, HSV color)
 	picture[y * width + x] = color.to_rgb().to_int();
 }
 
+void BMP::draw_mesh(uint16_t mesh_size, RGB mesh_color)
+{
+	//drawing vertical lines
+	for (uint16_t x = mesh_size; x < this->width; x += mesh_size) {
+		for (uint16_t y = 0; y < this->height; y++) {
+			this->set_pixel(x, y, mesh_color);
+		}
+	}
+	//drawing horizontal lines
+	for (uint16_t y = mesh_size; y < this->height; y += mesh_size) {
+		for (uint16_t x = 0; x < this->width; x++) {
+			this->set_pixel(x, y, mesh_color);
+		}
+	}
+}
+
 void BMP::save_as(const char* name)
 {
 	bmp_create(name, this->picture, this->width, this->height);
 }
 
-void test::svg_to_bmp(const char * input_name, const char* output_name, double board_width, double board_height)
+void test::svg_to_bmp(const std::string& svg_str, const char* output_name, double board_width, double board_height, uint16_t mesh_size, double scaling_factor)
 {
-	//reading in file
-	std::cout << "\nreading in " << input_name << " ..." << std::endl;
-	std::string str = read::string_from_file(input_name);
-	preprocess_str(str);
-
 	//finding out how often draw_to is called
 	unsigned int amount_points = 0;
 	double distance = 0;
 	Board_Vec current_point(0, 0);
-	std::function count_points_and_measure_distance = [&](Board_Vec point) {
+	bool pen_down = false;
+	unsigned int times_pen_moved_down = 0;
+	std::function compute_draw_to_values = [&](Board_Vec point) {
 		amount_points++; 
 		distance += abs(current_point - point);
 		current_point = point;
+		if (!pen_down) {
+			times_pen_moved_down++;
+		}
+		pen_down = true;
 	};
-	std::function measure_distance = [&](Board_Vec point) {
+	std::function compute_go_to_values = [&](Board_Vec point) {
 		distance += abs(current_point - point);
 		current_point = point;
+		pen_down = false;
 	};
-	set_output_functions(count_points_and_measure_distance, measure_distance);
-	read::evaluate_svg({ str.c_str(), str.length() }, board_width, board_height);
-	std::cout << "total distance the plotter moves to draw " << input_name << " is " << distance << " mm\n";
+	set_output_functions(compute_draw_to_values, compute_go_to_values);
+	read::evaluate_svg({ svg_str.c_str(), svg_str.length() }, board_width, board_height);
+
+	std::cout << "total distance the plotter moves is " << distance << " mm\n";
+	std::cout << "the pen was moved down " << times_pen_moved_down << " times\n";
+	const int time_in_seconds = distance / 4.44 + times_pen_moved_down * 1.0;
+	std::cout << "the estimated time to draw is " << time_in_seconds / 60 << " minutes and " << time_in_seconds % 60 << " seconds\n";
 
 	const double hue_per_point = 1.99 * pi / amount_points;	//just stay under 2 * pi, to not risk hue beeing slightly over 2 * pi in last point, due to rounding error
 	HSV hsv_color(0, 1, 1);
 
-	BMP picture(static_cast<uint16_t>(board_width), static_cast<uint16_t>(board_height), { 80, 80, 80 });
+	BMP picture(static_cast<uint16_t>(board_width * scaling_factor), static_cast<uint16_t>(board_height * scaling_factor), { 80, 80, 80 });
+	if (mesh_size > 0) {
+		picture.draw_mesh(mesh_size * scaling_factor, { 0, 0, 0 });
+	}
 
 	Board_Vec current(0, 0);
 
 
 	std::function draw_to = [&](Board_Vec point) {
+		point = scaling_factor * point;
 		double gradient = (point.y - current.y) / (point.x - current.x);
 		const RGB random_color = { std::rand() % 255, std::rand() % 255, std::rand() % 255 }; //can be used as an alternative to point_color
 		const auto point_color = hsv_color;	//please switch the desired color here
@@ -154,29 +180,24 @@ void test::svg_to_bmp(const char * input_name, const char* output_name, double b
 		hsv_color.hue += hue_per_point;
 	};
 	std::function go_to = [&](Board_Vec point) {
+		point = scaling_factor * point;
 		current = point;
 	};
 
 
 	std::cout << "draw picture..." << std::endl;
 	set_output_functions(draw_to, go_to);
-	read::evaluate_svg({ str.c_str(), str.length() }, board_width, board_height);
+	read::evaluate_svg({ svg_str.c_str(), svg_str.length() }, board_width, board_height);
 
 	std::cout << "save picture as " << output_name << " ..." << std::endl;
 	picture.save_as(output_name);
 }
 
-void test::svg_to_bbf(const char* input_name, const char* output_name, double board_width, double board_height)
+void test::svg_to_bbf(const std::string& svg_str, const char* output_name, double board_width, double board_height)
 {
-	//reading in file
-	std::cout << "\nreading in " << input_name << " ..." << std::endl;
-	std::string str = read::string_from_file(input_name);
-	preprocess_str(str);
-	
 	//opening new bbf file
 	std::ofstream output;
 	output.open(output_name);
-
 
 	std::function go_to = [&](Board_Vec point) {
 		output << "0 " << point.x << " " << point.y << "\n";
@@ -187,8 +208,21 @@ void test::svg_to_bbf(const char* input_name, const char* output_name, double bo
 
 	std::cout << "draw picture..." << std::endl;
 	set_output_functions(draw_to, go_to);
-	read::evaluate_svg({ str.c_str(), str.length() }, board_width, board_height);
+	read::evaluate_svg({ svg_str.c_str(), svg_str.length() }, board_width, board_height);
 
 	std::cout << "save picture as " << output_name << " ..." << std::endl;
 	output.close();
+}
+
+void test::read_string_to_bmp_and_bbf(const char* input_name, double board_width, double board_height)
+{
+	const std::string svg_name = std::string("samples/")      + std::string(input_name) + std::string(".svg");
+	const std::string bbf_name = std::string("samples/bbfs/") + std::string(input_name) + std::string(".bbf");
+	const std::string bmp_name = std::string("samples/bmps/") + std::string(input_name) + std::string(".bmp");
+
+	std::cout << "\nreading in " << svg_name << " ..." << std::endl;
+	std::string content_str = read::string_from_file(svg_name.c_str());
+	preprocess_str(content_str);
+	test::svg_to_bmp(content_str, bmp_name.c_str(), board_width, board_height, 100, 2);
+	test::svg_to_bbf(content_str, bbf_name.c_str(), board_width, board_height);
 }

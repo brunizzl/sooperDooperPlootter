@@ -35,11 +35,16 @@ public:
 
 	void set_pixel(uint16_t x, uint16_t y, RGB color);
 	void set_pixel(uint16_t x, uint16_t y, HSV color);
+	void draw_mesh(uint16_t mesh_size, RGB mesh_color);	//draws mesh with two lines seperated by mesh_size - 1 pixels
+
 	void save_as(const char* name);
 };
 
 namespace test {
 
-	void svg_to_bmp(const char * input_name, const char* output_name, double board_width, double board_height);
-	void svg_to_bbf(const char* input_name, const char* output_name, double board_width, double board_height);
+	void svg_to_bmp(const std::string& svg_str, const char* output_name, double board_width, double board_height, 
+		uint16_t mesh_size, double scaling_factor = 1);
+	void svg_to_bbf(const std::string& svg_str, const char* output_name, double board_width, double board_height);
+
+	void read_string_to_bmp_and_bbf(const char* input_name, double board_width, double board_height);
 }
