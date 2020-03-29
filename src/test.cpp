@@ -130,7 +130,7 @@ void test::svg_to_bmp(const std::string& svg_str, const char* output_name, doubl
 
 	std::cout << "total distance the plotter moves is " << distance << " mm\n";
 	std::cout << "the pen was moved down " << times_pen_moved_down << " times\n";
-	const int time_in_seconds = distance / 4.44 + times_pen_moved_down * 1.0;
+	const unsigned int time_in_seconds = static_cast<unsigned int>(distance / 4.44 + times_pen_moved_down * 1.0);
 	std::cout << "the estimated time to draw is " << time_in_seconds / 60 << " minutes and " << time_in_seconds % 60 << " seconds\n";
 
 	const double hue_per_point = 1.99 * la::pi / amount_points;	//just stay under 2 * pi, to not risk hue beeing slightly over 2 * pi in last point, due to rounding error
@@ -138,7 +138,7 @@ void test::svg_to_bmp(const std::string& svg_str, const char* output_name, doubl
 
 	BMP picture(static_cast<uint16_t>(board_width * scaling_factor), static_cast<uint16_t>(board_height * scaling_factor), { 80, 80, 80 });
 	if (mesh_size > 0) {
-		picture.draw_mesh(mesh_size * scaling_factor, { 0, 0, 0 });
+		picture.draw_mesh(static_cast<uint16_t>(mesh_size * scaling_factor), { 0, 0, 0 });
 	}
 
 	la::Board_Vec current(0, 0);
@@ -147,18 +147,21 @@ void test::svg_to_bmp(const std::string& svg_str, const char* output_name, doubl
 	std::function draw_to = [&](la::Board_Vec point) {
 		point = scaling_factor * point;
 		double gradient = (point.y - current.y) / (point.x - current.x);
-		const RGB random_color = { std::rand() % 255, std::rand() % 255, std::rand() % 255 }; //can be used as an alternative to point_color
+		const RGB random_color = { 
+			static_cast<unsigned char>(std::rand() % 255), 
+			static_cast<unsigned char>(std::rand() % 255), 
+			static_cast<unsigned char>(std::rand() % 255) }; //can be used as an alternative to point_color
 		const auto point_color = hsv_color;	//please switch the desired color here
 		if (std::abs(gradient) < 1) {
 			const double y_axis_offset = point.y - gradient * point.x;
 			if (current.x < point.x) {
-				for (int x = current.x; x <= point.x; x++) {
-					picture.set_pixel(x, gradient * x + y_axis_offset, point_color);
+				for (int x = static_cast<int>(current.x); x <= point.x; x++) {
+					picture.set_pixel(x, static_cast<uint16_t>(gradient * x + y_axis_offset), point_color);
 				}
 			}
 			else {
-				for (int x = current.x; x >= point.x; x--) {
-					picture.set_pixel(x, gradient * x + y_axis_offset, point_color);
+				for (int x = static_cast<int>(current.x); x >= point.x; x--) {
+					picture.set_pixel(x, static_cast<uint16_t>(gradient * x + y_axis_offset), point_color);
 				}
 			}
 		}
@@ -166,13 +169,13 @@ void test::svg_to_bmp(const std::string& svg_str, const char* output_name, doubl
 			gradient = 1 / gradient;
 			const double x_axis_offset = point.x - gradient * point.y;
 			if (current.y < point.y) {
-				for (int y = current.y; y <= point.y; y++) {
-					picture.set_pixel(gradient * y + x_axis_offset, y, point_color);
+				for (int y = static_cast<int>(current.y); y <= point.y; y++) {
+					picture.set_pixel(static_cast<uint16_t>(gradient * y + x_axis_offset), y, point_color);
 				}
 			}
 			else {
-				for (int y = current.y; y >= point.y; y--) {
-					picture.set_pixel(gradient * y + x_axis_offset, y, point_color);
+				for (int y = static_cast<int>(current.y); y >= point.y; y--) {
+					picture.set_pixel(static_cast<uint16_t>(gradient * y + x_axis_offset), y, point_color);
 				}
 			}
 		}
