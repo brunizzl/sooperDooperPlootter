@@ -8,17 +8,6 @@
 
 #include "linearAlgebra.hpp"
 
-
-// "main" function
-//reads svg at file path "name" and moves plotter accordingly
-// board_width and board_height are the dimensions of the board the plotter draws on in mm
-void draw_from_file(const char* name, double board_width, double board_height);
-
-//assumes str to hold svg and removes comments (everything between "<!--" and "-->")
-//also swaps out newlines within quotes to spaces ("...d=\"M100 100 \n L20 30...\"..." becomes "...d=\"M100 100   L20 30...\"...")
-//and inserts spaces in front of '-', as spaces are used to seperate numbers
-void preprocess_str(std::string& str);
-
 //the svg standard allows for view boxes to be defined inside other view boxes.
 //this forces an implementation of the complete standard to check every coordinate transformation, if we are still within the view box.
 //this removes the possibility of expressing a combination of transformations as matrix multiplication. 
@@ -46,11 +35,15 @@ public:
 
 
 
-
-
-
 //all functions used while parsing/reading
 namespace read {
+
+	//opens file with name file_name and reads full file in as string
+	std::string string_from_file(const char* file_name);
+
+	//assumes str to hold svg and removes comments (everything between "<!--" and "-->")
+	//also swaps out newlines within quotes to spaces ("...d=\"M100 100 \n L20 30...\"..." becomes "...d=\"M100 100   L20 30...\"...")
+	void preprocess_str(std::string& str);
 
 	//what is given in the following part of the string (basically everything written in angle brackets, as "<circle ..>" or "<svg ...>"
 	//naming based on https://www.w3.org/TR/SVG11/struct.html
@@ -79,8 +72,6 @@ namespace read {
 		Elem_Type::rect, Elem_Type::ellipse, Elem_Type::circle, Elem_Type::path, Elem_Type::g, };
 
 	std::string_view name_of(Elem_Type type);
-
-	std::string_view end_marker(Elem_Type type);
 
 	//just like search_zone.find(find, start) but ignores everything written in between quotes
 	std::size_t find_skip_quotations(std::string_view search_zone, std::string_view find, std::size_t start = 0);
@@ -117,7 +108,7 @@ namespace read {
 	//assumes to have only the numer and (optionally) a unit passed as parameter
 	//example: to_scaled("100")   yields 100.0
 	//         to_scaled("100cm") yields 3543.307
-	//if a unit is not implemented here (the relative ones), the function returns unknown_unit constant 
+	//if a unit is not implemented here (the relative ones), the function returns the value as if unit was px
 	//if val_str turns out to be empty, default_val is returned
 	double to_scaled(std::string_view val_str, double default_val = 0);
 
@@ -125,9 +116,6 @@ namespace read {
 
 	//returns Elem_Data of next element and shortens view to after the current element
 	Elem_Data take_next_elem(std::string_view& view);
-
-	//opens file with name file_name and reads full file in as string
-	std::string string_from_file(const char* file_name);
 
 	//sets view box and calls functions for elements in svg
 	void evaluate_svg(std::string_view svg_view, double board_width, double board_height);
@@ -225,6 +213,9 @@ namespace path {
 
 
 //resolution in draw() determines in how many straight lines the shape is split
+//although a straight line can already be described by a straight line perfectly, it may also be of advantage to split it, 
+// as the linear interpolation on the plotterside to draw from one point to the nex may suffer from the non-linear nature of the
+// transformation from kartesian coordinates to cable lengths.
 //transform in draw() is matrix needed to transform from current coordinate system to board system
 namespace draw {
 	constexpr std::size_t default_res = 100;

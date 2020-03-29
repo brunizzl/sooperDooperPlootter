@@ -16,29 +16,6 @@
 ///////////////////////////////////////////////////////////functions loal to this file/////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-//displays vector in console (expects vectors local_view (type T) to already be able to be drawn to console)
-template <typename T>
-std::ostream& operator<<(std::ostream& stream, const std::vector<T>& vec)
-{
-	stream << '{';
-	bool first = true;
-	for (const auto& elem : vec) {
-		if (!std::exchange(first, false)) {
-			stream << ", ";
-		}
-		stream << elem;
-	}
-	stream << '}';
-	return stream;
-}
-
-//displays matrix on console
-std::ostream& operator<<(std::ostream& stream, const la::Transform_Matrix& matrix)
-{
-	return stream << '[' << matrix.a << ", " << matrix.b << ", " << matrix.c << ", " << matrix.d << ", " << matrix.e << ", " << matrix.f << ']';
-}
-
-
 //returns view shortened to new_length
 std::string_view shorten_to(std::string_view view, std::size_t new_length)
 {
@@ -46,8 +23,7 @@ std::string_view shorten_to(std::string_view view, std::size_t new_length)
 	return { view.data(), new_length };
 }
 
-//convinience function to change angle units from degree to rad
-double to_rad(double degree)
+constexpr double to_rad(double degree)
 {
 	return degree * la::pi / 180.0;
 }
@@ -103,46 +79,6 @@ std::string_view in_between(std::string_view original, std::size_t fst, std::siz
 ///////////////////////////////////////////////////////////functions visible from the outside//////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void draw_from_file(const char* name, double board_width, double board_height)
-{
-	std::string str = read::string_from_file(name);
-	preprocess_str(str);
-	read::evaluate_svg({ str.c_str(), str.length() }, board_width, board_height);
-}
-
-void preprocess_str(std::string& str)
-{
-	std::size_t comment_start = str.find("<!--");
-	while (comment_start != std::string::npos) {
-		const std::size_t comment_length = str.find("-->", comment_start) - comment_start + std::strlen("-->");
-		str.erase(comment_start, comment_length);
-		comment_start = str.find("<!--", comment_start);
-	}
-
-	bool inside_quotes = false;
-	bool inside_elem = false;
-	for (auto& ch : str) {
-		switch (ch) {
-		case '\"':
-		case '\'':
-			inside_quotes = !inside_quotes;
-			break;
-		case '<':
-			inside_elem = true;
-			break;
-		case '>':
-			inside_elem = false;
-			break;
-		case '\n':
-			if (inside_elem) {	      //this part is mainly, because the path attribute may include newlines. 
-				ch = ' ';			  //to keep some readability for debugging, only the newlines inside elements are replaced.
-			}
-			break;
-		}
-	}
-	assert(!inside_quotes && !inside_elem);	//there should be an even number of '\"' (or '\'') in the string.
-}
-
 //default values (get replaced by set() anyway)
 la::Board_Vec View_Box::min = la::Board_Vec(0, 0);
 la::Board_Vec View_Box::max = la::Board_Vec(100, 100);
@@ -160,7 +96,7 @@ la::Transform_Matrix View_Box::private_set(double min_x, double min_y, double wi
 		View_Box::min.y = 0;
 		View_Box::max.y = board_height;
 
-		//     shift to middle of board     scaling to board units                  translate in svg units to (0, 0)
+		//     shift to middle of board         scaling to board units                      translate in svg units to (0, 0)
 		return la::translate({ x_offset, 0 }) * la::scale(scaling_factor, scaling_factor) * la::translate({ -min_x, -min_y });
 	}
 	else {	//view box is wider than board -> full use of board_width, but only use upper part of board
@@ -208,6 +144,58 @@ bool View_Box::contains(la::Board_Vec point)
 
 
 using namespace read;
+
+std::string read::string_from_file(const char* file_name)
+{
+	std::string str;
+	{
+		//taken from: http://insanecoding.blogspot.com/2011/11/how-to-read-in-file-in-c.html
+		std::ifstream filestream(file_name);
+		if (!filestream) {
+			std::cout << "Error: expected to find file \"" << file_name << "\" relative to programm path.\n";
+			throw std::exception("Could not open SVG");
+		}
+
+		filestream.seekg(0, std::ios::end);
+		str.resize(static_cast<const std::size_t>(filestream.tellg()));		//static_cast silences type shortening warning
+		filestream.seekg(0, std::ios::beg);
+		filestream.read(&str[0], str.size());
+	}
+	return str;
+}
+
+void read::preprocess_str(std::string& str)
+{
+	std::size_t comment_start = str.find("<!--");
+	while (comment_start != std::string::npos) {
+		const std::size_t comment_length = str.find("-->", comment_start) - comment_start + std::strlen("-->");
+		str.erase(comment_start, comment_length);
+		comment_start = str.find("<!--", comment_start);
+	}
+
+	bool inside_quotes = false;	//currently only used for checking if svg is valid
+	bool inside_elem = false;
+	for (auto& ch : str) {
+		switch (ch) {
+		case '\"':
+		case '\'':
+			inside_quotes = !inside_quotes;
+			break;
+		case '<':
+			inside_elem = true;
+			break;
+		case '>':
+			inside_elem = false;
+			break;
+		case '\n':
+			if (inside_elem) {	      //this part is mainly, because the path attribute may include newlines. 
+				ch = ' ';			  //to keep some readability for debugging, only the newlines inside elements are replaced.
+			}
+			break;
+		}
+	}
+	assert(!inside_quotes && !inside_elem);	//there should be an even number of '\"' (or '\'') in the string.
+}
 
 std::string_view read::name_of(Elem_Type type)
 {
@@ -273,7 +261,10 @@ std::vector<double> read::from_csv(std::string_view csv, bool always_comma)
 
 	std::size_t next_value_start = csv.find_first_of("0123456789.+-");
 	while (next_value_start != std::string::npos) {
-		const std::size_t next_seperator = csv.find_first_of((always_comma? "," : ", -"), next_value_start + 1);	//minus may also be used as seperator
+		std::size_t next_seperator = csv.find_first_of((always_comma? "," : ", -"), next_value_start + 1);	//minus may also be used as seperator
+		if (next_seperator != std::string::npos && csv[next_seperator - 1] == 'e') {	//if true, next_seperator points at '-' in something like "100e-4", witch is undesired
+			next_seperator = csv.find_first_of((always_comma ? "," : ", -"), next_seperator + 1);
+		}
 		const std::string_view next_value = in_between(csv, next_value_start - 1, next_seperator);
 		result.push_back(to_scaled(next_value));
 		next_value_start = csv.find_first_of("0123456789.+-", next_seperator);
@@ -309,7 +300,6 @@ double read::to_scaled(std::string_view name, double default_val)
 				return result * to_pixel(unit);
 			}
 		}
-		//hier muesste noch fehlerbehandlung falls ne nicht bekannte einheit genutzt wird hin <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <--
 	}
 	return result;
 }
@@ -325,6 +315,9 @@ Elem_Data read::take_next_elem(std::string_view& view)
 	for (Elem_Type type : all_elem_types) {
 		const std::string_view type_name = name_of(type);
 		if (view.compare(0, type_name.length(), type_name) == 0) {
+			if (view[type_name.length()] != ' ' && view[type_name.length()] != '>') {
+				continue;	//after the name, there is expected to be a space or the end of the element. is this is not fulfilled, type_name is only prefix of views real type.
+			}
 			view.remove_prefix(type_name.length());		//"circle cx=..." becomes " cx=..."
 			const std::size_t end = find_skip_quotations(view, ">");
 			const std::string_view content = shorten_to(view, end);		//it is just expected that an end marker was found.
@@ -336,25 +329,6 @@ Elem_Data read::take_next_elem(std::string_view& view)
 	const std::size_t end = find_skip_quotations(view, ">");
 	view.remove_prefix(end + std::strlen(">"));	//it is just expected that an end marker was found.
 	return { Elem_Type::unknown, "" };
-}
-
-std::string read::string_from_file(const char* file_name)
-{
-	std::string str;
-	{
-		//taken from: http://insanecoding.blogspot.com/2011/11/how-to-read-in-file-in-c.html
-		std::ifstream filestream(file_name);
-		if (!filestream) {
-			std::cout << "Error: expected to find file \"" << file_name << "\" relative to programm path.\n";
-			throw std::exception("Could not open SVG");
-		}
-
-		filestream.seekg(0, std::ios::end);
-		str.resize(static_cast<const std::size_t>(filestream.tellg()));		//static_cast silences type shortening warning
-		filestream.seekg(0, std::ios::beg);
-		filestream.read(&str[0], str.size());
-	}
-	return str;
 }
 
 void read::evaluate_svg(std::string_view svg_view, double board_width, double board_height)
@@ -570,7 +544,7 @@ la::Vec2D path::process_quadr_bezier(const la::Transform_Matrix& transform_matri
 
 				draw::quadr_bezier(transform_matrix * current_point, transform_matrix * control, transform_matrix * end);
 				current_point = end;
-				last_control_point = control;	//not used in this loop, but the loop for implicit control points
+				last_control_point = control;	//not used in this loop, but the loop for implicit control points (below)
 			}
 		}
 		if (curve.control_data == Control_Given::impl) {
@@ -622,7 +596,7 @@ la::Vec2D path::process_cubic_bezier(const la::Transform_Matrix& transform_matri
 
 				draw::cubic_bezier(transform_matrix * current_point, transform_matrix * control_1, transform_matrix * control_2, transform_matrix * end);
 				current_point = end;
-				last_control_point = control_2;	//not used in this loop, but the loop for implicit control points
+				last_control_point = control_2;	//not used in this loop, but the loop for implicit control points (below)
 			}
 		}
 		if (curve.control_data == Control_Given::impl) {

@@ -12,14 +12,11 @@ struct RGB
 
 struct HSV
 {
-	double hue;
-	double saturation;
-	double value;
+	double hue;			//assumed to be in [0, 2 * pi]
+	double saturation;	//assumed to be in [0, 1]
+	double value;		//assumed to be in [0, 1]
 
-public:
-	HSV(double hue_, double saturation_, double value_);
-
-	RGB to_rgb();
+	RGB to_rgb() const;
 };
 
 //bitmap coordinates are same as board coordinates

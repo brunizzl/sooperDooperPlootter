@@ -17,15 +17,7 @@ uint32_t RGB::to_int()
 	return ((uint32_t)this->red * 256 + this->green) * 256 + this->blue;
 }
 
-HSV::HSV(double hue_, double saturation_, double value_)
-	:hue(hue_), saturation(saturation_), value(value_)
-{
-	assert(hue_ >= 0 && hue_ <= 2 * la::pi);
-	assert(saturation_ >= 0 && saturation_ <= 1);
-	assert(value_ >= 0 && value_ <= 1);
-}
-
-RGB HSV::to_rgb()
+RGB HSV::to_rgb() const
 {
 	//formulas taken from here : https://en.wikipedia.org/wiki/HSL_and_HSV
 
@@ -113,7 +105,7 @@ void test::svg_to_bmp(const std::string& svg_str, const char* output_name, doubl
 	unsigned int times_pen_moved_down = 0;
 	std::function compute_draw_to_values = [&](la::Board_Vec point) {
 		amount_points++; 
-		distance += abs(current_point - point);
+		distance += la::abs(current_point - point);
 		current_point = point;
 		if (!pen_down) {
 			times_pen_moved_down++;
@@ -121,7 +113,7 @@ void test::svg_to_bmp(const std::string& svg_str, const char* output_name, doubl
 		pen_down = true;
 	};
 	std::function compute_go_to_values = [&](la::Board_Vec point) {
-		distance += abs(current_point - point);
+		distance += la::abs(current_point - point);
 		current_point = point;
 		pen_down = false;
 	};
@@ -133,8 +125,8 @@ void test::svg_to_bmp(const std::string& svg_str, const char* output_name, doubl
 	const unsigned int time_in_seconds = static_cast<unsigned int>(distance / 4.44 + times_pen_moved_down * 1.0);
 	std::cout << "the estimated time to draw is " << time_in_seconds / 60 << " minutes and " << time_in_seconds % 60 << " seconds\n";
 
-	const double hue_per_point = 1.99 * la::pi / amount_points;	//just stay under 2 * pi, to not risk hue beeing slightly over 2 * pi in last point, due to rounding error
-	HSV hsv_color(0, 1, 1);
+	const double hue_per_point = 1.99 * la::pi / amount_points;	//just stay under 2 * pi, to not risk hue beeing slightly over 2 * pi in last point due to rounding error
+	HSV hsv_color = { 0, 1, 1 };
 
 	BMP picture(static_cast<uint16_t>(board_width * scaling_factor), static_cast<uint16_t>(board_height * scaling_factor), { 80, 80, 80 });
 	if (mesh_size > 0) {
@@ -150,7 +142,7 @@ void test::svg_to_bmp(const std::string& svg_str, const char* output_name, doubl
 		const RGB random_color = { 
 			static_cast<unsigned char>(std::rand() % 255), 
 			static_cast<unsigned char>(std::rand() % 255), 
-			static_cast<unsigned char>(std::rand() % 255) }; //can be used as an alternative to point_color
+			static_cast<unsigned char>(std::rand() % 255) }; //can be used as an alternative to point_color (only makes sence, when draw::resolution is set to 1)
 		const auto point_color = hsv_color;	//please switch the desired color here
 		if (std::abs(gradient) < 1) {
 			const double y_axis_offset = point.y - gradient * point.x;
@@ -225,7 +217,7 @@ void test::read_string_to_bmp_and_bbf(const char* input_name, double board_width
 
 	std::cout << "\nreading in " << svg_name << " ..." << std::endl;
 	std::string content_str = read::string_from_file(svg_name.c_str());
-	preprocess_str(content_str);
-	test::svg_to_bmp(content_str, bmp_name.c_str(), board_width, board_height, 100, 2);
+	read::preprocess_str(content_str);
+	test::svg_to_bmp(content_str, bmp_name.c_str(), board_width, board_height, 0, 2);
 	test::svg_to_bbf(content_str, bbf_name.c_str(), board_width, board_height);
 }

@@ -28,7 +28,7 @@ int real_main(int argc, char* argv[])
 		}
 		std::cout << "\nreading in " << svg_name << " ..." << std::endl;
 		std::string content_str = read::string_from_file(svg_name.c_str());
-		preprocess_str(content_str);
+		read::preprocess_str(content_str);
 		test::svg_to_bmp(content_str, bmp_name.c_str(), width, height, mesh_size, 2);
 		test::svg_to_bbf(content_str, bbf_name.c_str(), width, height);
 	}
@@ -45,11 +45,12 @@ int real_main(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
-	return real_main(argc, argv);
+	//return real_main(argc, argv);
 	const double width = 350;
 	const double height = 350;
 	//test::read_string_to_bmp_and_bbf("1", width, height);
-	//test::read_string_to_bmp_and_bbf("homer-simpson", width, height);
+	//test::read_string_to_bmp_and_bbf("w3test1", width, height);
+	test::read_string_to_bmp_and_bbf("homer-simpson", width, height);
 	//test::read_string_to_bmp_and_bbf("bojack", width, height);
 
 	//std::cin.get();
