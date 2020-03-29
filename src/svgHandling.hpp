@@ -70,6 +70,9 @@ class View_Box
 	static Board_Vec min;	//upper left corner of box
 	static Board_Vec max;	//lower right corner of box
 
+	//called by public set functions
+	static Transform_Matrix private_set(double min_x, double min_y, double width, double height, double board_width, double board_height);
+
 public:
 
 	//sets view box to have aspect ratio as described in data, but stored in Board units (mm)
@@ -266,7 +269,7 @@ namespace path {
 //resolution in draw() determines in how many straight lines the shape is split
 //transform in draw() is matrix needed to transform from current coordinate system to board system
 namespace draw {
-	constexpr std::size_t default_res = 40;
+	constexpr std::size_t default_res = 100;
 
 	void line     (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
 	void rect     (Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);

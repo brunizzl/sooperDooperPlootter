@@ -96,10 +96,20 @@ void test::svg_to_bmp(const char * input_name, const char* output_name, double b
 
 	//finding out how often draw_to is called
 	unsigned int amount_points = 0;
-	std::function count_points = [&amount_points](Board_Vec point) {amount_points++; };
-	std::function do_nothing = [](Board_Vec point) {; };	
-	set_output_functions(count_points, do_nothing);
+	double distance = 0;
+	Board_Vec current_point(0, 0);
+	std::function count_points_and_measure_distance = [&](Board_Vec point) {
+		amount_points++; 
+		distance += abs(current_point - point);
+		current_point = point;
+	};
+	std::function measure_distance = [&](Board_Vec point) {
+		distance += abs(current_point - point);
+		current_point = point;
+	};
+	set_output_functions(count_points_and_measure_distance, measure_distance);
 	read::evaluate_svg({ str.c_str(), str.length() }, board_width, board_height);
+	std::cout << "total distance the plotter moves to draw " << input_name << " is " << distance << " mm\n";
 
 	const double hue_per_point = 1.99 * pi / amount_points;	//just stay under 2 * pi, to not risk hue beeing slightly over 2 * pi in last point, due to rounding error
 	HSV hsv_color(0, 1, 1);

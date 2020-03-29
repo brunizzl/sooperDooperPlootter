@@ -101,6 +101,11 @@ bool operator==(Board_Vec a, Board_Vec b)
 	return (a.x == b.x && a.y == b.y);
 }
 
+double abs(Board_Vec vec)
+{
+	return std::sqrt(vec.x * vec.x + vec.y * vec.y);
+}
+
 std::ostream& operator<<(std::ostream& stream, Board_Vec& coord)
 {
 	stream << "(" << coord.x << ", " << coord.y << ")";

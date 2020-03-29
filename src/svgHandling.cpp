@@ -223,6 +223,35 @@ Board_Vec View_Box::min = Board_Vec(0, 0);
 Board_Vec View_Box::max = Board_Vec(100, 100);
 
 
+Transform_Matrix View_Box::private_set(double min_x, double min_y, double width, double height, double board_width, double board_height)
+{
+	if (width / height < board_width / board_height) {	//view box has taller aspect ratio than board -> leaving space on right and left side of board
+		const double scaling_factor = board_height / height;	//y-direction limits size
+		const double view_width_in_board_units = width * scaling_factor;	//width of view box given in board coordinates
+		const double x_offset = (board_width - view_width_in_board_units) / 2;	//x-coordinate of left boundary of view box given in board coordinates
+
+		View_Box::min.x = x_offset;
+		View_Box::max.x = x_offset + view_width_in_board_units;
+		View_Box::min.y = 0;
+		View_Box::max.y = board_height;
+
+		//     shift to middle of board     scaling to board units                  translate in svg units to (0, 0)
+		return translate({ x_offset, 0 }) * scale(scaling_factor, scaling_factor) * translate({ -min_x, -min_y });
+	}
+	else {	//view box is wider than board -> full use of board_width, but only use upper part of board
+		const double scaling_factor = board_width / width;
+		const double view_height_in_board_units = height * scaling_factor;
+
+		View_Box::min.x = 0;
+		View_Box::max.x = board_width;
+		View_Box::min.y = 0;
+		View_Box::max.y = view_height_in_board_units;
+
+		//     scaling to board units                  translate in svg units to (0, 0)
+		return scale(scaling_factor, scaling_factor) * translate({ -min_x, -min_y });
+	}
+}
+
 Transform_Matrix View_Box::set(std::string_view data, double board_width, double board_height)
 {
 	const std::vector<double> values = read::from_csv(data);
@@ -233,65 +262,12 @@ Transform_Matrix View_Box::set(std::string_view data, double board_width, double
 	const double width = values[2];
 	const double height = values[3];
 
-	if (width / height < board_width / board_height) {	//view box has taller aspect ratio than board -> leaving space on right and left side of board
-		const double scaling_factor = board_height / height;	//y-direction limits size
-		const double view_width_in_board_units = width * scaling_factor;	//width of view box given in board coordinates
-		const double x_offset = (board_width - view_width_in_board_units) / 2;	//x-coordinate of left boundary of view box given in board coordinates
-
-		View_Box::min.x = x_offset;
-		View_Box::max.x = x_offset + view_width_in_board_units;
-		View_Box::min.y = 0;
-		View_Box::max.y = board_height;
-
-		//     shift to middle of board     scaling to board units                  translate in svg units to (0, 0)
-		return translate({ x_offset, 0 }) * scale(scaling_factor, scaling_factor) * translate({ -min_x, -min_y });
-	}
-	else {	//view box is wider than board -> full use of board_width, but only use lower part of board
-		const double scaling_factor = board_width / width;
-		const double view_height_in_board_units = height * scaling_factor;
-		const double y_offset = board_height - view_height_in_board_units;
-
-		View_Box::min.x = 0;
-		View_Box::max.x = board_width;
-		View_Box::min.y = y_offset;
-		View_Box::max.y = y_offset + view_height_in_board_units;
-
-		//     shift to middle of board     scaling to board units                  translate in svg units to (0, 0)
-		return translate({ 0, y_offset }) * scale(scaling_factor, scaling_factor) * translate({ -min_x, -min_y });
-	}
+	return private_set(min_x, min_y, width, height, board_width, board_height);
 }
 
 Transform_Matrix View_Box::set(double width, double height, double board_width, double board_height)
 {
-	const double min_x = 0;
-	const double min_y = 0;
-
-	if (width / height < board_width / board_height) {	//view box has taller aspect ratio than board -> leaving space on right and left side of board
-		const double scaling_factor = board_height / height;	//y-direction limits size
-		const double view_width_in_board_units = width * scaling_factor;	//width of view box given in board coordinates
-		const double x_offset = (board_width - view_width_in_board_units) / 2;	//x-coordinate of left boundary of view box given in board coordinates
-
-		View_Box::min.x = x_offset;
-		View_Box::max.x = x_offset + view_width_in_board_units;
-		View_Box::min.y = 0;
-		View_Box::max.y = board_height;
-
-		//     shift to middle of board     scaling to board units                  translate in svg units to (0, 0)
-		return translate({ x_offset, 0 }) * scale(scaling_factor, scaling_factor) * translate({ -min_x, -min_y });
-	}
-	else {	//view box is wider than board -> full use of board_width, but only use lower part of board
-		const double scaling_factor = board_width / width;
-		const double view_height_in_board_units = height * scaling_factor;
-		const double y_offset = board_height - view_height_in_board_units;
-
-		View_Box::min.x = 0;
-		View_Box::max.x = board_width;
-		View_Box::min.y = y_offset;
-		View_Box::max.y = y_offset + view_height_in_board_units;
-
-		//     shift to middle of board     scaling to board units                  translate in svg units to (0, 0)
-		return translate({ 0, y_offset }) * scale(scaling_factor, scaling_factor) * translate({ -min_x, -min_y });
-	}
+	return private_set(0, 0, width, height, board_width, board_height);
 }
 
 bool View_Box::contains(Board_Vec point)
@@ -496,11 +472,7 @@ void read::evaluate_svg(std::string_view svg_view, double board_width, double bo
 
 void read::evaluate_fragment(std::string_view fragment, const Transform_Matrix& transform)
 {
-	Elem_Data next;
-	do {
-		next = take_next_elem(fragment);
-	} while (next.type == Elem_Type::unknown);
-
+	Elem_Data next = take_next_elem(fragment);	//function removes prefix belonging to next also
 	while (next.type != Elem_Type::end) {
 		switch (next.type) {
 		case Elem_Type::svg:
@@ -536,12 +508,10 @@ void read::evaluate_fragment(std::string_view fragment, const Transform_Matrix& 
 		case Elem_Type::ellipse:	draw::ellipse(transform, next.content);		break;
 		case Elem_Type::circle:		draw::circle(transform, next.content);		break;
 		case Elem_Type::path:		draw::path(transform, next.content);		break;
+
+		case Elem_Type::unknown: break;	//just read in the next element and do nothing
 		}
-
-
-		do {
-			next = take_next_elem(fragment);
-		} while (next.type == Elem_Type::unknown);
+		next = take_next_elem(fragment);	//function removes prefix belonging to next also
 	}
 }
 
@@ -818,7 +788,7 @@ Vec2D path::process_arc(const Transform_Matrix& transform_matrix, Path_Elem_data
 	for (std::size_t i = 0; i < points.size(); i += 7) {
 		double rx = std::abs(points[i]);			//needs to be able to be updated if to small
 		double ry = std::abs(points[i + 1]);		//needs to be able to be updated if to small
-		const double phi = to_rad(std::fmod(points[i + 2], 360.0));		//often called x_axis_rotation
+		const double phi = to_rad(std::fmod(points[i + 2], 360.0));		//phi is often called x_axis_rotation by w3
 		const bool large_arc_flag = points[i + 3];	//w3 says any nonzero value is meant as true
 		const bool sweep_flag = points[i + 4];
 		const double x2 = data.coords_type == Coords_Type::absolute ? points[i + 5] : current_point.x + points[i + 5];
@@ -828,7 +798,6 @@ Vec2D path::process_arc(const Transform_Matrix& transform_matrix, Path_Elem_data
 		const double y1 = current_point.y;
 
 		//the following is taken from here: https://www.w3.org/TR/SVG11/implnote.html#ArcImplementationNotes
-		//the code assumes to have valid data and will not check if the arc is to small.
 
 		//going from  x1 y1 x2 y2 fA fS rx ry phi  to  cx cy theta1 delta theta: (described a little down on that side)
 
@@ -864,7 +833,7 @@ Vec2D path::process_arc(const Transform_Matrix& transform_matrix, Path_Elem_data
 		const double start_angle = angle({ 1, 0 }, v1);			//called theta 1 by w3
 		double delta_angle = angle(v1, v2);		                //called delta theta by w3
 		if (large_arc_flag) {
-			delta_angle += delta_angle > 0 ? -2 * pi : 2 * pi;	//function angle() is guaranteed to return a value in interval (-pi, pi]
+			delta_angle += (delta_angle > 0 ? -2 * pi : 2 * pi);	//function angle() is guaranteed to return a value in interval (-pi, pi]
 		}
 		if (sweep_flag == (delta_angle < 0)) {	//either sweep_flag is set and delta_angle is smaller than 0 or both are false to enter the condition
 			delta_angle *= -1;

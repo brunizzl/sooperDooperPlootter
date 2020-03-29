@@ -60,6 +60,9 @@ Board_Vec operator-(Board_Vec a);
 Board_Vec operator*(double factor, Board_Vec vec);
 bool operator==(Board_Vec a, Board_Vec b);
 
+//returns 2-Norm of vec
+double abs(Board_Vec vec);
+
 std::ostream& operator<<(std::ostream& stream, const Board_Vec& coord);
 
 
