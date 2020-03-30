@@ -49,9 +49,9 @@ int main(int argc, char* argv[])
 
 	const double width = 350;
 	const double height = 350;
-	//test::read_string_to_bmp_and_bbf("1", width, height);
-	//test::read_string_to_bmp_and_bbf("w3test1", width, height);
-	//test::read_string_to_bmp_and_bbf("homer-simpson", width, height);
-	//test::read_string_to_bmp_and_bbf("bojack", width, height);
+	//test::read_string_to_all("1", width, height);
+	//test::read_string_to_all("w3test1", width, height);
+	//test::read_string_to_all("homer-simpson", width, height);
+	//test::read_string_to_all("bojack", width, height);
 }
 

@@ -1,7 +1,9 @@
 #pragma once
 
 #include <stdint.h>
+#include <fstream>
 
+#include "linearAlgebra.hpp"
 
 struct RGB
 {
@@ -37,12 +39,28 @@ public:
 	void save_as(const char* name);
 };
 
+//this is not meant as real svg exporter, but just as a way to visualize output data
+class SVG	
+{
+	std::ofstream document;
+
+public:
+	//min and max are used to set view box in svg
+	SVG(const char* file_name, la::Board_Vec min, la::Board_Vec max);
+	~SVG();
+
+	void move_to(la::Board_Vec point);
+	void draw_to(la::Board_Vec point);
+};
+
 namespace test {
 
 	void svg_to_bmp(const std::string& svg_str, const char* output_name, double board_width, double board_height, 
 		uint16_t mesh_size, double scaling_factor = 1);
 	void svg_to_bbf(const std::string& svg_str, const char* output_name, double board_width, double board_height);
 
+	void svg_to_svg(const std::string& svg_str, const char* output_name, double board_width, double board_height);
+
 	//this function expects a specific folder structure
-	void read_string_to_bmp_and_bbf(const char* input_name, double board_width, double board_height);
+	void read_string_to_all(const char* input_name, double board_width, double board_height);
 }

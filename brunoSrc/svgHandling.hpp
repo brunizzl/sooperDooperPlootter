@@ -218,7 +218,7 @@ namespace path {
 // transformation from kartesian coordinates to cable lengths.
 //transform in draw() is matrix needed to transform from current coordinate system to board system
 namespace draw {
-	constexpr std::size_t default_res = 100;
+	constexpr std::size_t default_res = 10;
 
 	void line     (la::Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);
 	void rect     (la::Transform_Matrix transform_matrix, std::string_view parameters, std::size_t resolution = default_res);

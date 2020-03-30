@@ -6,7 +6,6 @@
 #include <fstream>
 
 #include "test.hpp"
-#include "linearAlgebra.hpp"
 #include "svgHandling.hpp"
 #include "libBMP.h"
 
@@ -94,6 +93,37 @@ void BMP::save_as(const char* name)
 {
 	bmp_create(name, this->picture, this->width, this->height);
 }
+
+
+
+
+SVG::SVG(const char* file_name, la::Board_Vec min, la::Board_Vec max)
+	:document(file_name)
+{
+	this->document << "<!DOCTYPE html>\n";
+	this->document << "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"" << min.x << ' ' << min.y << ' ' << max.x - min.x << ' ' << max.y - min.y << "\">\n";
+	this->document << "<path style=\"stroke: #ff0000; stroke-width: 1; fill: none;\" d=\"";
+}
+
+SVG::~SVG()
+{
+	std::cout << "saving output svg...\n";
+	this->document << "\"/>\n</svg>\n";
+	this->document.close();
+}
+
+void SVG::move_to(la::Board_Vec point)
+{
+	this->document << 'M' << point.x << ' ' << point.y;
+}
+
+void SVG::draw_to(la::Board_Vec point)
+{
+	this->document << ' ' << point.x << ' ' << point.y;
+}
+
+
+
 
 void test::svg_to_bmp(const std::string& svg_str, const char* output_name, double board_width, double board_height, uint16_t mesh_size, double scaling_factor)
 {
@@ -209,15 +239,31 @@ void test::svg_to_bbf(const std::string& svg_str, const char* output_name, doubl
 	output.close();
 }
 
-void test::read_string_to_bmp_and_bbf(const char* input_name, double board_width, double board_height)
+void test::svg_to_svg(const std::string& svg_str, const char* output_name, double board_width, double board_height)
 {
-	const std::string svg_name = std::string("samples/")      + std::string(input_name) + std::string(".svg");
-	const std::string bbf_name = std::string("samples/bbfs/") + std::string(input_name) + std::string(".bbf");
-	const std::string bmp_name = std::string("samples/bmps/") + std::string(input_name) + std::string(".bmp");
+	SVG output(output_name, la::Board_Vec(0, 0), la::Board_Vec(board_width - 0, board_height - 0));
+
+	std::function go_to = [&](la::Board_Vec point) {
+		output.move_to(point);
+	};
+	std::function draw_to = [&](la::Board_Vec point) {
+		output.draw_to(point);
+	};
+	set_output_functions(draw_to, go_to);
+	read::evaluate_svg({ svg_str.c_str(), svg_str.length() }, board_width, board_height);
+}
+
+void test::read_string_to_all(const char* input_name, double board_width, double board_height)
+{
+	const std::string svg_name     = std::string("samples/")         + std::string(input_name) + std::string(".svg");
+	const std::string bbf_name     = std::string("samples/bbfs/")    + std::string(input_name) + std::string(".bbf");
+	const std::string bmp_name     = std::string("samples/bmps/")    + std::string(input_name) + std::string(".bmp");
+	const std::string out_svg_name = std::string("samples/outsvgs/") + std::string(input_name) + std::string("_out.svg");
 
 	std::cout << "\nreading in " << svg_name << " ..." << std::endl;
 	std::string content_str = read::string_from_file(svg_name.c_str());
 	read::preprocess_str(content_str);
-	test::svg_to_bmp(content_str, bmp_name.c_str(), board_width, board_height, 0, 2);
-	test::svg_to_bbf(content_str, bbf_name.c_str(), board_width, board_height);
+	//test::svg_to_bmp(content_str, bmp_name.c_str(), board_width, board_height, 0, 2);
+	//test::svg_to_bbf(content_str, bbf_name.c_str(), board_width, board_height);
+	test::svg_to_svg(content_str, out_svg_name.c_str(), board_width, board_height);
 }
