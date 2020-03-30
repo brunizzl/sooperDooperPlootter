@@ -7,7 +7,7 @@ The second part is found in folder basheySrc. This second program is meant to be
 
 The syntax of a bff command bff is as follows: [flag] [x-coordinate] [y-coordinate], where [flag] is eighter '0' meaning "go to the specified coordinates" or '1' meaning "draw a straight line from the current position to the specified coordinates". A bbf file can have an abitrary ammount of commands, but is required to start with a goto.
 
-The plotter itself is not an own design, but developed by Fredrik Stridsman, his project can be found here https://github.com/snebragd/stringent. We thank Fredrik to enable our project.
+The plotter itself is not an own design, but developed by Fredrik Stridsman, his project can be found here https://github.com/snebragd/stringent.
 
 The library libBMP.h is taken from the course "Prozedurale Programmierung" at Hamburg University of Tecnology written by 
 Florian Kerkhoff.
