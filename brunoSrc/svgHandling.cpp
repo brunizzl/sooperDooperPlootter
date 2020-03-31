@@ -350,7 +350,7 @@ void read::evaluate_svg(std::string_view svg_view, double board_width, double bo
 
 void read::evaluate_fragment(std::string_view fragment, const la::Transform_Matrix& transform)
 {
-	Elem_Data next = take_next_elem(fragment);	//function removes prefix belonging to next also
+	Elem_Data next = take_next_elem(fragment);	//function also removes prefix belonging to next
 	while (next.type != Elem_Type::end) {
 		switch (next.type) {
 		case Elem_Type::svg:

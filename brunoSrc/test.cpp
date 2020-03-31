@@ -263,7 +263,7 @@ void test::read_string_to_all(const char* input_name, double board_width, double
 	std::cout << "\nreading in " << svg_name << " ..." << std::endl;
 	std::string content_str = read::string_from_file(svg_name.c_str());
 	read::preprocess_str(content_str);
-	//test::svg_to_bmp(content_str, bmp_name.c_str(), board_width, board_height, 0, 2);
+	test::svg_to_bmp(content_str, bmp_name.c_str(), board_width, board_height, 0, 2.2);
 	//test::svg_to_bbf(content_str, bbf_name.c_str(), board_width, board_height);
 	test::svg_to_svg(content_str, out_svg_name.c_str(), board_width, board_height);
 }
