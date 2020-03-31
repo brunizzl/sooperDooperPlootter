@@ -10,7 +10,7 @@ The syntax of a bff command bff is as follows: [flag] [x-coordinate] [y-coordina
 The plotter itself is not an own design, but developed by Fredrik Stridsman, his project can be found here https://github.com/snebragd/stringent.
 
 The library libBMP.h is taken from the course "Prozedurale Programmierung" at Hamburg University of Tecnology written by 
-Florian Kerkhoff.
+Kai Ohlhus.
 
 # Setup
 
