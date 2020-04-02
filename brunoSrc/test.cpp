@@ -133,7 +133,7 @@ void test::svg_to_bmp(const std::string& svg_str, const char* output_name, doubl
 	la::Board_Vec current_point(0, 0);
 	bool pen_down = false;
 	unsigned int times_pen_moved_down = 0;
-	std::function compute_draw_to_values = [&](la::Board_Vec point) {
+	auto compute_draw_to_values = [&](la::Board_Vec point) {
 		amount_points++; 
 		distance += la::abs(current_point - point);
 		current_point = point;
@@ -142,7 +142,7 @@ void test::svg_to_bmp(const std::string& svg_str, const char* output_name, doubl
 		}
 		pen_down = true;
 	};
-	std::function compute_go_to_values = [&](la::Board_Vec point) {
+	auto compute_go_to_values = [&](la::Board_Vec point) {
 		distance += la::abs(current_point - point);
 		current_point = point;
 		pen_down = false;
@@ -166,7 +166,7 @@ void test::svg_to_bmp(const std::string& svg_str, const char* output_name, doubl
 	la::Board_Vec current(0, 0);
 
 
-	std::function draw_to = [&](la::Board_Vec point) {
+	auto draw_to = [&](la::Board_Vec point) {
 		point = scaling_factor * point;
 		double gradient = (point.y - current.y) / (point.x - current.x);
 		const RGB random_color = { 
@@ -204,7 +204,7 @@ void test::svg_to_bmp(const std::string& svg_str, const char* output_name, doubl
 		current = point; 
 		hsv_color.hue += hue_per_point;
 	};
-	std::function go_to = [&](la::Board_Vec point) {
+	auto go_to = [&](la::Board_Vec point) {
 		point = scaling_factor * point;
 		current = point;
 	};
@@ -224,10 +224,10 @@ void test::svg_to_bbf(const std::string& svg_str, const char* output_name, doubl
 	std::ofstream output;
 	output.open(output_name);
 
-	std::function go_to = [&](la::Board_Vec point) {
+	auto go_to = [&](la::Board_Vec point) {
 		output << "0 " << point.x << " " << point.y << "\n";
 	};
-	std::function draw_to = [&](la::Board_Vec point) {
+	auto draw_to = [&](la::Board_Vec point) {
 		output << "1 " << point.x << " " << point.y << "\n";
 	};
 
@@ -243,10 +243,10 @@ void test::svg_to_svg(const std::string& svg_str, const char* output_name, doubl
 {
 	SVG output(output_name, la::Board_Vec(0, 0), la::Board_Vec(board_width - 0, board_height - 0));
 
-	std::function go_to = [&](la::Board_Vec point) {
+	auto go_to = [&](la::Board_Vec point) {
 		output.move_to(point);
 	};
-	std::function draw_to = [&](la::Board_Vec point) {
+	auto draw_to = [&](la::Board_Vec point) {
 		output.draw_to(point);
 	};
 	set_output_functions(draw_to, go_to);
